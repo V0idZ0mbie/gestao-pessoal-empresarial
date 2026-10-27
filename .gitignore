@@ -1,0 +1,16 @@
+# Ignore everything by default, except what we need
+
+### Compiled / generated
+build/
+dist/
+*.min.js
+
+### Dependencies (already in node_modules, not needed for a static site)
+node_modules/
+
+### OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log

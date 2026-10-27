@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestão Pessoal & Empresarial</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <!-- Font Awesome (ícones) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+  <!-- ===== Layout principal ===== -->
+  <div class="app">
+    <!-- Menu lateral -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <i class="fas fa-warehouse"></i>
+          <span>GestãoPro</span>
+        </div>
+        <button id="menu-toggle" class="icon-btn" aria-label="Fechar menu">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <ul>
+          <li>
+            <a href="#/dashboard" class="nav-link active">
+              <i class="fas fa-home"></i> <span>Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a href="#/accounts" class="nav-link">
+              <i class="fas fa-university"></i> <span>Contas</span>
+            </a>
+          </li>
+          <li>
+            <a href="#/clients" class="nav-link">
+              <i class="fas fa-users"></i> <span>Clientes</span>
+            </a>
+          </li>
+          <li>
+            <a href="#/expenses" class="nav-link">
+              <i class="fas fa-shopping-cart"></i> <span>Gastos</span>
+            </a>
+          </li>
+          <li>
+            <a href="#/investments" class="nav-link">
+              <i class="fas fa-chart-line"></i> <span>Investimentos</span>
+            </a>
+          </li>
+          <li>
+            <a href="#/service-orders" class="nav-link">
+              <i class="fas fa-tasks"></i> <span>Ordens de Serviço</span>
+            </a>
+          </li>
+          <li>
+            <a href="#/cadastros" class="nav-link">
+              <i class="fas fa-folder"></i> <span>Cadastros</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+      <div class="sidebar-footer">
+        <small>Versão 1.0.0</small>
+      </div>
+    </aside>
+
+    <!-- Conteúdo principal -->
+    <main class="main" id="main-content">
+      <!-- O conteúdo é renderizado aqui -->
+    </main>
+  </div>
+
+  <!-- ===== Modal genérico ===== -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h2 id="modal-title">Título</h2>
+        <button id="modal-close" class="icon-btn"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <!-- Formulários são injetados aqui -->
+      </div>
+      <div class="modal-footer">
+        <button id="modal-cancel" class="btn btn-ghost">Cancelar</button>
+        <button id="modal-submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notifications -->
+  <div id="toast-container"></div>
+
+  <!-- ===== Scripts ===== -->
+  <script src="js/storage.js"></script>
+  <script src="js/views/dashboard.js"></script>
+  <script src="js/modules/accounts.js"></script>
+  <script src="js/modules/clients.js"></script>
+  <script src="js/modules/expenses.js"></script>
+  <script src="js/modules/investments.js"></script>
+  <script src="js/modules/service-orders.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
