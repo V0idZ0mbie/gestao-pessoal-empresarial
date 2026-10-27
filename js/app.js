@@ -92,6 +92,16 @@ const App = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Inicializa tema (claro/escuro)
+  const defaultTheme = () => {
+    const stored = sessionStorage.getItem('gp_theme');
+    if (stored === 'light' || stored === 'dark') return stored;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  };
+  const theme = defaultTheme();
+  document.documentElement.setAttribute('data-theme', theme);
+  sessionStorage.setItem('gp_theme', theme);
+
   App.init();
   window.addEventListener('hashchange', () => { App.renderCurrentView(); });
 });
