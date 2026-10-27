@@ -1,101 +1,118 @@
 # Gestão Pessoal e Empresarial — Dashboard em HTML e JavaScript
 
-Dashboard 100% estático em HTML/CSS/JavaScript, hospedável em qualquer
-endpoint estático (GitHub Pages, Netlify, Vercel, etc.). **Não requer
-servidor backend** — a autenticação e os dados ficam no navegador
-(`localStorage`/`sessionStorage`).
+Dashboard 100% estático em HTML/CSS/JavaScript, hospedável em qualquer endpoint estático (GitHub Pages, Netlify, Vercel, etc.). **Não requer servidor backend** — a autenticação e os dados ficam no Supabase.
 
-Integra:
+## Funcionalidades
 
-- 🏦 Contas bancárias
-- 👥 Clientes
-- 💰 Gastos
-- 📈 Investimentos
-- 🔧 Ordens de serviço
-- 📋 Cadastros gerais
+- 🏦 **Contas bancárias** — Listar, adicionar, editar e excluir contas (banco, tipo, saldo)
+- 👥 **Clientes** — Cadastro de clientes com contato e endereço
+- 💰 **Gastos** — Registrar gastos com valor, data, categoria e descrição
+- 📈 **Investimentos** — Registrar investimentos (tipo, valor, data, lucro/reelei)
+- 🔧 **Ordens de serviço** — Gerar e acompanhar OLS com status (aberta, em andamento, concluída)
+- 📋 **Cadastros** — Geral de cadastros
 
-**Segurança de dados (cliente-side):**
+## Arquitetura
 
-- Senhas são hasheadas com SHA-256 + sal (Web Crypto API) e armazenadas
-  em `localStorage` (coleção `gp_users`).
-- Cada sessão tem um token temporário em `sessionStorage` (`gp_token`).
-- Os dados de cada usuário são armazenados em `localStorage` com prefíxo
-  `gp_` e filtrados pelo `userId` do usuário logado.
-- ⚠️ **Limitação legítima:** como não há backend, os dados ficam **no
-  navegador do usuário** e não são compartilháveis entre dispositivos nem
-  sincronizáveis. Ideal para uso pessoal/na nuvem em um único perfil do
-  navegador. Para sincronização multipla, adicione um backend (API REST +
-  banco) e aponte `storage.js` a ele.
+- **Frontend:** HTML/CSS/JS puro (sem framework, sem build, sem servidor)
+- **Banco de dados:** Supabase (PostgreSQL + Supabase Auth)
+- **Autenticação:** Supabase Auth (email + password)
+- **Armazenamento:** Supabase Storage (PostgreSQL, dado isolado por `user_id`)
+- **Deploy:** GitHub Pages (estático, sem build)
+
+## Segurança de dados
+
+- **Senhas:** gerenciadas pelo Supabase Auth (hash nativo, nunca expõe a senha no frontend)
+- **Dados:** cada item de dado possui o campo `user_id`, que corresponde ao usuário logado no Supabase
+- **API keys:** só chave anônima do Supabase é usada no frontend (não expõe credenciais sensíveis)
 
 ## Como usar
+
+### Configurar Supabase (1_click)
+
+1. Acesse [Supabase](https://supabase.com) e crie um projeto
+2. Copie a **URL de projeto** (ex: `https://abc123.supabase.co`) e a **chave anônima** (`anon` key)
+3. Edite `js/supabase.js` e preencha:
+
+   ```javascript
+   window.SUPABASE_URL = "SUA_URL_AQUI";
+   window.SUPABASE_ANON_KEY = "SUA_CHAVE_ANON_KEY";
+   ```
+
+4. (Opcional) Crie as tabelas necessárias no Supabase SQL Editor:
+
+   ```sql
+   -- Exemplo: tabela accounts
+   create table accounts (
+     id          uuid primary key default gen_random_uuid(),
+     user_id     uuid not null,
+     banco       text not null,
+     titular     text not null,
+     tipo        text,
+     saldo       numeric,
+     created_at  timestamptz default now(),
+     updated_at  timestamptz
+   );
+
+   -- Regras de segurança (Row Level Security)
+   alter table accounts enable row level security;
+   create policy "Usuários só veem o seus próprios dados"
+     on accounts for select
+     using (auth.uid() = user_id);
+   ```
+
+5. Faça o upload do repositório e configure o GitHub Pages.
 
 ### Opção 1 — Hospedado (recomendado)
 
 1. Fazer login no GitHub e ir em **Settings → Developers → GitHub Pages**
-2. Configurar a página na raiz (`/`) ou `/static/`
+2. Configurar a página na raiz (`/`) e a fonte sendo o repositório principal
 3. O app estará disponível em `https://<seu-username>.github.io/gestao-pessoal-empresarial/`
 
 ### Opção 2 — Local
 
 1. Clonar o repositório
-2. Abrir `static/index.html` em um navegador (não precisa servidor)
-
-## Como usar
-
-1. **Criar conta** → clique em "Criar conta grátis" (ou "Fazer login" se
-   já tiver cadastro) → preencha usuário e senha.
-2. **Entrar** → use o menu lateral ou o link de login.
-3. **Navegar** → use o menu lateral para ver Contas, Clientes, Gastos,
-   Investimentos e Ordens de serviço.
-4. **Importar dados de exemplo** → no Dashboard, clique em "Importar dados
-   de exemplo" para carregar um conjunto de demonstração.
+2. Abrir `index.html` em um navegador (não precisa servidor, mas é recomendável usar um servidor local para evitar bloqueios de CORS)
 
 ## Estrutura do projeto
 
 ```
-static/
-├── index.html          # Ponto de entrada
+.
+├── index.html                  # Ponto de entrada
 ├── css/
-│   └── style.css       # Estilos globais
+│   └── style.css               # Estilos globais
 ├── js/
-│   ├── app.js          # Router / navegação / inicialização
-│   ├── auth.js         # Autenticação (login/register/logout)
-│   ├── storage.js      # Abstração de localStorage (com escopo por usuário)
-│   ├── toast.js        # Notificações
-│   ├── views/          # Páginas
-│   │   ├── auth.js     # Login / Cadastro
-│   │   └── dashboard.js # Visão-resumo da Dashboard
-│   └── modules/        # Módulos independentes (CRUD por módulo)
+│   ├── app.js                  # Router / navegação / inicialização
+│   ├── auth.js                 # Autenticação (Supabase Auth)
+│   ├── storage.js              # Abstração de persistência (Supabase)
+│   ├── supabase.js             # Configuração do Supabase
+│   ├── toast.js                # Notificações
+│   ├── views/
+│   │   ├── auth.js             # Login / Cadastro
+│   │   └── dashboard.js        # Visão-resumo da Dashboard
+│   └── modules/
 │       ├── accounts.js
 │       ├── clients.js
 │       ├── expenses.js
 │       ├── investments.js
 │       └── service-orders.js
-└── README.md
+├── README.md
+└── .gitignore
 ```
 
-## Módulos
+## Como expor novos dados
 
-| Módulo | Responsabilidade |
-|--------|-------------------|
-| Contas bancárias | Listar, adicionar, editar e excluir contas (banco, tipo, saldo) |
-| Clientes | Cadastro de clientes com contato e endereço |
-| Gastos | Registrar gastos com valor, data, categoria e descrição |
-| Investimentos | Registrar investimentos (tipo, valor, data, lucro/reelei) |
-| Ordens de serviço | Gerar e acompanhar OLS com status (aberta, em andamento, concluída) |
+Cada módulo `modules/*.js` é independente e usa a camada `Storage`:
 
-Cada módulo segue o mesmo padrão:
-- `renderList(container, ...)` — popula a tabela
-- `openForm(id)` — abre o modal de adicionar/editar
-- `deleteItem(id)` — exclui com confirmação
-- Usa `Storage.get/add/update/remove/find` para persistência
+- `Storage.get(collection)` — lista itens do usuário logado
+- `Storage.add(collection, item)` — cria um novo item
+- `Storage.update(collection, id, patch)` — atualiza um item
+- `Storage.remove(collection, id)` — exclui um item
 
-## Como expandir
+Para adicionar um novo módulo:
 
-- Cada `modules/*.js` é independente.
-- Adicione novos módulos seguindo o mesmo padrão.
-- Para sincronizar entre dispositivos, substitua `storage.js` por uma
-  implementação que chame uma API REST (é a única camada de persistência).
+1. Crie `js/modules/novoModulo.js`
+2. Siga o padrão dos módulos existentes
+3. Registre a rota no `js/app.js`
 
 ## Licença
 

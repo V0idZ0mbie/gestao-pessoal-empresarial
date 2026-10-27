@@ -8,10 +8,6 @@ const AccountsModule = (() => {
     return Storage.get(COLLECTION);
   }
 
-  function save(items) {
-    return Storage.set(COLLECTION, items);
-  }
-
   async function renderList(container) {
     const items = await Storage.get(COLLECTION);
     container.innerHTML = `
@@ -44,9 +40,9 @@ const AccountsModule = (() => {
     `;
   }
 
-  function openForm(id) {
+  async function openForm(id) {
     const overlay = document.getElementById('modal-overlay');
-    const items = collection();
+    const items = await collection();
     const item = id ? items.find(a => a.id === id) : null;
     const title = item ? 'Editar conta' : 'Nova conta';
     document.getElementById('modal-title').textContent = title;

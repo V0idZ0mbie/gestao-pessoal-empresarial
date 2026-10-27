@@ -9,8 +9,8 @@ const ROUTES = {
   investments: { view: 'InvestmentsModule', icon: 'fa-chart-line', needsAuth: true },
   'service-orders': { view: 'ServiceOrdersModule', icon: 'fa-tasks', needsAuth: true },
   cadastros: { view: 'ClientsModule', icon: 'fa-folder', needsAuth: true },
-  login: { view: 'LoginView', icon: 'fa-sign-in-alt', needsAuth: false },
-  register: { view: 'RegisterView', icon: 'fa-user-plus', needsAuth: false },
+  login: { view: 'AuthViews.renderLogin', icon: 'fa-sign-in-alt', needsAuth: false },
+  register: { view: 'AuthViews.renderRegister', icon: 'fa-user-plus', needsAuth: false },
 };
 
 const App = {
@@ -42,11 +42,18 @@ const App = {
 
     const container = document.getElementById('main-content');
     const View = window[routeInfo.view];
+    let renderFn;
 
-    if (View && typeof View.render === 'function') {
+    if (typeof View === 'function') {
+      renderFn = View;
+    } else if (View && typeof View === 'object' && window[View] && typeof window[View].render === 'function') {
+      renderFn = window[View].render;
+    }
+
+    if (renderFn) {
       container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>';
       await new Promise(r => setTimeout(r, 0));
-      await View.render(container);
+      await renderFn(container);
     } else {
       container.innerHTML = '<div class="card"><p style="color:var(--text-muted);">Página não encontrada.</p></div>';
     }

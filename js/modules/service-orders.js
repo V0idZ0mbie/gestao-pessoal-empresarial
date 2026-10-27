@@ -42,8 +42,8 @@ const ServiceOrdersModule = (() => {
     `;
   }
 
-  function openForm(id) {
-    const items = collection();
+  async function openForm(id) {
+    const items = await collection();
     const so = id ? items.find(s => s.id === id) : null;
     const overlay = document.getElementById('modal-overlay');
     const title = so ? 'Editar ordem de servico' : 'Nova ordem de servico';

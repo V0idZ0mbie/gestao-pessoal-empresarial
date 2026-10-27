@@ -1,4 +1,4 @@
-// ===== Views de Login e Cadastro =====
+// ===== Views de Login e Cadastro (Supabase) =====
 
 const AuthViews = {
   // Renderiza a página de login
@@ -14,8 +14,8 @@ const AuthViews = {
       <div class="card" style="max-width:380px;margin:40px auto;">
         <form id="login-form">
           <div class="form-group">
-            <label>Usuário</label>
-            <input id="f-user" type="text" placeholder="Seu usuário" autocomplete="username" required />
+            <label>E-mail</label>
+            <input id="f-email" type="email" placeholder="Seu e-mail" autocomplete="email" required />
           </div>
           <div class="form-group">
             <label>Senha</label>
@@ -31,18 +31,13 @@ const AuthViews = {
     const form = document.getElementById('login-form');
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const username = document.getElementById('f-user').value.trim();
+      const email = document.getElementById('f-email').value.trim();
       const password = document.getElementById('f-pass').value;
-      if (!username || !password) { Toast.show('Preencha usuário e senha.', 'error'); return; }
+      if (!email || !password) { Toast.show('Preencha e-mail e senha.', 'error'); return; }
       try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Falha no login');
-        setToken(data.token);
+        const res = await window.loginUser(email, password);
+        if (res.error) throw new Error(res.error);
+        Toast.show('Login realizado com sucesso!', 'success');
         window.location.hash = '/dashboard';
       } catch (err) {
         Toast.show(err.message, 'error');
@@ -63,12 +58,12 @@ const AuthViews = {
       <div class="card" style="max-width:400px;margin:40px auto;">
         <form id="register-form">
           <div class="form-group">
-            <label>Usuário</label>
-            <input id="f-user" type="text" placeholder="Seu usuário" autocomplete="username" required />
+            <label>E-mail</label>
+            <input id="f-email" type="email" placeholder="email@exemplo.com" autocomplete="email" required />
           </div>
           <div class="form-group">
-            <label>Email (opcional)</label>
-            <input id="f-email" type="email" placeholder="email@exemplo.com" autocomplete="email" />
+            <label>Usuário</label>
+            <input id="f-user" type="text" placeholder="Seu usuário" autocomplete="username" required />
           </div>
           <div class="form-group">
             <label>Senha</label>
@@ -84,26 +79,18 @@ const AuthViews = {
     const form = document.getElementById('register-form');
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const username = document.getElementById('f-user').value.trim();
       const email = document.getElementById('f-email').value.trim();
+      const username = document.getElementById('f-user').value.trim();
       const password = document.getElementById('f-pass').value;
-      if (!username || !password || password.length < 6) {
-        Toast.show('Preencha usuário e senha com pelo menos 6 caracteres.', 'error');
+      if (!email || !username || !password || password.length < 6) {
+        Toast.show('Preencha todos os campos com uma senha de pelo menos 6 caracteres.', 'error');
         return;
       }
       try {
-        const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, email, password })
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          if (res.status === 409) throw new Error('Username já existe.');
-          throw new Error(data.error || 'Falha no cadastro');
-        }
-        setToken(data.token);
-        window.location.hash = '/dashboard';
+        const res = await window.registerUser(username, email, password);
+        if (res.error) throw new Error(res.error);
+        Toast.show('Conta criada! Faça login.', 'success');
+        window.location.hash = '/login';
       } catch (err) {
         Toast.show(err.message, 'error');
       }

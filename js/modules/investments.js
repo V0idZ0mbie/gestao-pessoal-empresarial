@@ -39,8 +39,8 @@ const InvestmentsModule = (() => {
     `;
   }
 
-  function openForm(id) {
-    const items = collection();
+  async function openForm(id) {
+    const items = await collection();
     const item = id ? items.find(i => i.id === id) : null;
     const overlay = document.getElementById('modal-overlay');
     const title = item ? 'Editar investimento' : 'Novo investimento';

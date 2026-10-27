@@ -38,8 +38,8 @@ const ExpensesModule = (() => {
     `;
   }
 
-  function openForm(id) {
-    const items = collection();
+  async function openForm(id) {
+    const items = await collection();
     const item = id ? items.find(e => e.id === id) : null;
     const overlay = document.getElementById('modal-overlay');
     const title = item ? 'Editar gasto' : 'Novo gasto';

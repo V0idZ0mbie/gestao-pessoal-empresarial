@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="./" />
   <title>Gestão Pessoal & Empresarial</title>
   <link rel="stylesheet" href="css/style.css" />
   <!-- Font Awesome (ícones) -->
@@ -93,11 +94,15 @@
   <div id="toast-container"></div>
 
   <!-- ===== Scripts ===== -->
-  <!-- Auth helpers (token management) -->
+  <!-- Supabase (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase configuration -->
+  <script src="js/supabase.js"></script>
+  <!-- Auth helpers (Supabase Auth) -->
   <script src="js/auth.js"></script>
   <!-- Toast notifications -->
   <script src="js/toast.js"></script>
-  <!-- Storage API (calls backend) -->
+  <!-- Storage API (Supabase) -->
   <script src="js/storage.js"></script>
   <!-- Dashboard view -->
   <script src="js/views/dashboard.js"></script>
