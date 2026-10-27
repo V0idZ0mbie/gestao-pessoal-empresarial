@@ -3,11 +3,11 @@
 // investimentos e ordens de serviço abertas.
 
 const DashboardView = {
-  render(container) {
-    const accounts = Storage.get('accounts', []);
-    const expenses = Storage.get('expenses', []);
-    const investments = Storage.get('investments', []);
-    const sos = Storage.get('service-orders', []);
+  async render(container) {
+    const accounts = await Storage.get('accounts');
+    const expenses = await Storage.get('expenses');
+    const investments = await Storage.get('investments');
+    const sos = await Storage.get('service_orders');
 
     const month = new Date();
     const monthStart = new Date(month.getFullYear(), month.getMonth(), 1).toISOString();
@@ -91,7 +91,7 @@ const DashboardView = {
           </div>
           <div class="table-wrap" style="max-height:240px;overflow:auto;">
             <table>
-              <thead><tr><th>Cliente</th><th>Descrição</th><th>Status</th></tr></thead>
+              <thead><tr><th>Cliente</th><th>Descricao</th><th>Status</th></tr></thead>
               <tbody>
                 ${soS.slice(-5).reverse().map(s => {
                   const c = Storage.find('clients', cl => cl.id === s.clienteId);
@@ -119,14 +119,13 @@ const DashboardView = {
   }
 };
 
-// helper de escape
+// help
 function escapeHtml(str = '') {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
 }
 
-// helper de moeda
 function formatBRL(value) {
   const n = typeof value === 'number' ? value : parseFloat(value) || 0;
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

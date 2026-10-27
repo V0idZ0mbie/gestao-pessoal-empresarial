@@ -4,11 +4,16 @@
 const AccountsModule = (() => {
   const COLLECTION = 'accounts';
 
-  function collection() { return Storage.get(COLLECTION, []); }
-  function save(items) { Storage.set(COLLECTION, items); }
+  function collection() {
+    return Storage.get(COLLECTION);
+  }
 
-  function renderList(container) {
-    const items = collection();
+  function save(items) {
+    return Storage.set(COLLECTION, items);
+  }
+
+  async function renderList(container) {
+    const items = await Storage.get(COLLECTION);
     container.innerHTML = `
       <div class="header">
         <div>
@@ -40,10 +45,11 @@ const AccountsModule = (() => {
   }
 
   function openForm(id) {
+    const overlay = document.getElementById('modal-overlay');
     const items = collection();
     const item = id ? items.find(a => a.id === id) : null;
-    const overlay = document.getElementById('modal-overlay');
-    document.getElementById('modal-title').textContent = item ? 'Editar conta' : 'Nova conta';
+    const title = item ? 'Editar conta' : 'Nova conta';
+    document.getElementById('modal-title').textContent = title;
     document.getElementById('modal-body').innerHTML = `
       <div class="form-group">
         <label>Banco</label>
@@ -67,36 +73,43 @@ const AccountsModule = (() => {
         <input id="f-saldo" type="number" step="0.01" min="0" placeholder="0,00" />
       </div>
     `;
-    document.getElementById('modal-title').textContent = item ? 'Editar conta' : 'Nova conta';
     document.getElementById('modal-submit').textContent = item ? 'Atualizar' : 'Salvar';
 
-    document.getElementById('modal-submit').onclick = () => {
+    document.getElementById('modal-submit').onclick = async () => {
       const banco = document.getElementById('f-banco').value.trim();
       const titular = document.getElementById('f-titular').value.trim();
       const tipo = document.getElementById('f-tipo').value;
       const saldo = parseFloat(document.getElementById('f-saldo').value) || 0;
       if (!banco || !titular) { Toast.show('Preencha banco e titular.', 'error'); return; }
-      if (item) {
-        Storage.update(COLLECTION, item.id, { banco, titular, tipo, saldo });
-        Toast.show('Conta atualizada.', 'success');
-      } else {
-        const newId = Storage.nextId(COLLECTION);
-        Storage.add(COLLECTION, { id: newId, banco, titular, tipo, saldo, createdAt: new Date().toISOString() });
-        Toast.show('Conta cadastrada.', 'success');
+      try {
+        const payload = { banco, titular, tipo, saldo };
+        if (item) {
+          await Storage.update(COLLECTION, item.id, payload);
+          Toast.show('Conta atualizada.', 'success');
+        } else {
+          const newItem = await Storage.add(COLLECTION, { ...payload, createdAt: new Date().toISOString() });
+          Toast.show('Conta cadastrada.', 'success');
+        }
+        closeModal();
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      } catch (err) {
+        Toast.show(err.message || 'Erro ao salvar.', 'error');
       }
-      closeModal();
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
     };
     overlay.classList.add('open');
   }
 
-  function deleteItem(id) {
-    const item = collection().find(a => a.id === id);
+  async function deleteItem(id) {
+    const item = await Storage.find(COLLECTION, a => a.id === id);
     if (!item) return;
     if (!confirm(`Excluir a conta de ${item.titular} (${item.banco})?`)) return;
-    Storage.remove(COLLECTION, id);
-    Toast.show('Conta excluída.', 'success');
-    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    try {
+      await Storage.remove(COLLECTION, id);
+      Toast.show('Conta excluída.', 'success');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    } catch (err) {
+      Toast.show(err.message || 'Erro ao excluir.', 'error');
+    }
   }
 
   function closeModal() {

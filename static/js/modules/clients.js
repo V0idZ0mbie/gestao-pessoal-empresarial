@@ -4,11 +4,10 @@
 const ClientsModule = (() => {
   const COLLECTION = 'clients';
 
-  function collection() { return Storage.get(COLLECTION, []); }
-  function save(items) { Storage.set(COLLECTION, items); }
+  function collection() { return Storage.get(COLLECTION); }
 
-  function renderList(container) {
-    const items = collection();
+  async function renderList(container) {
+    const items = await Storage.get(COLLECTION);
     container.innerHTML = `
       <div class="header">
         <div>
@@ -68,37 +67,44 @@ const ClientsModule = (() => {
     `;
     document.getElementById('modal-submit').textContent = item ? 'Atualizar' : 'Salvar';
 
-    document.getElementById('modal-submit').onclick = () => {
+    document.getElementById('modal-submit').onclick = async () => {
       const nome = document.getElementById('f-nome').value.trim();
       if (!nome) { Toast.show('Preencha o nome.', 'error'); return; }
-      const data = {
+      const payload = {
         nome,
         empresa: document.getElementById('f-empresa').value.trim(),
         email: document.getElementById('f-email').value.trim(),
         telefone: document.getElementById('f-telefone').value.trim(),
         endereco: document.getElementById('f-endereco').value.trim(),
       };
-      if (item) {
-        Storage.update(COLLECTION, item.id, data);
-        Toast.show('Cliente atualizado.', 'success');
-      } else {
-        const newId = Storage.nextId(COLLECTION);
-        Storage.add(COLLECTION, { id: newId, ...data, createdAt: new Date().toISOString() });
-        Toast.show('Cliente cadastrado.', 'success');
+      try {
+        if (item) {
+          await Storage.update(COLLECTION, item.id, payload);
+          Toast.show('Cliente atualizado.', 'success');
+        } else {
+          const newItem = await Storage.add(COLLECTION, { ...payload, createdAt: new Date().toISOString() });
+          Toast.show('Cliente cadastrado.', 'success');
+        }
+        closeModal();
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      } catch (err) {
+        Toast.show(err.message || 'Erro ao salvar.', 'error');
       }
-      closeModal();
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
     };
     overlay.classList.add('open');
   }
 
-  function deleteItem(id) {
-    const item = collection().find(c => c.id === id);
+  async function deleteItem(id) {
+    const item = await Storage.find(COLLECTION, c => c.id === id);
     if (!item) return;
     if (!confirm(`Excluir o cliente ${item.nome}?`)) return;
-    Storage.remove(COLLECTION, id);
-    Toast.show('Cliente excluído.', 'success');
-    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    try {
+      await Storage.remove(COLLECTION, id);
+      Toast.show('Cliente excluído.', 'success');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    } catch (err) {
+      Toast.show(err.message || 'Erro ao excluir.', 'error');
+    }
   }
 
   function closeModal() {

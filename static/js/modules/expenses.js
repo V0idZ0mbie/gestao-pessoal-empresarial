@@ -1,14 +1,13 @@
 // ============ Gastos ============
-// CRUD de gastos: descrição, valor, data, categoria.
+// CRUD de gastos: descricao, valor, data, categoria.
 
 const ExpensesModule = (() => {
   const COLLECTION = 'expenses';
 
-  function collection() { return Storage.get(COLLECTION, []); }
-  function save(items) { Storage.set(COLLECTION, items); }
+  function collection() { return Storage.get(COLLECTION); }
 
-  function renderList(container) {
-    const items = collection();
+  async function renderList(container) {
+    const items = await Storage.get(COLLECTION);
     container.innerHTML = `
       <div class="header">
         <div>
@@ -19,7 +18,7 @@ const ExpensesModule = (() => {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Data</th><th>Descricao</th><th>Categoria</th><th>Valor</th><th>Acoes</th></tr></thead>
           <tbody>
             ${items.map(e => `
               <tr>
@@ -47,7 +46,7 @@ const ExpensesModule = (() => {
     document.getElementById('modal-title').textContent = title;
     document.getElementById('modal-body').innerHTML = `
       <div class="form-group">
-        <label>Descrição *</label>
+        <label>Descricao *</label>
         <input id="f-descricao" type="text" placeholder="O que foi gasto" />
       </div>
       <div class="form-group">
@@ -61,12 +60,12 @@ const ExpensesModule = (() => {
       <div class="form-group">
         <label>Categoria</label>
         <select id="f-categoria">
-          <option value="Alimentação">Alimentação</option>
+          <option value="Alimentacao">Alimentacao</option>
           <option value="Transporte">Transporte</option>
           <option value="Moradia">Moradia</option>
-          <option value="Saúde">Saúde</option>
+          <option value="Saude">Saude</option>
           <option value="Lazer">Lazer</option>
-          <option value="Educação">Educação</option>
+          <option value="Educacao">Educacao</option>
           <option value="Outros">Outros</option>
         </select>
       </div>
@@ -80,34 +79,41 @@ const ExpensesModule = (() => {
     `;
     document.getElementById('modal-submit').textContent = item ? 'Atualizar' : 'Salvar';
 
-    document.getElementById('modal-submit').onclick = () => {
+    document.getElementById('modal-submit').onclick = async () => {
       const descricao = document.getElementById('f-descricao').value.trim();
       const valor = parseFloat(document.getElementById('f-valor').value) || 0;
       const data = document.getElementById('f-data').value;
-      if (!descricao) { Toast.show('Preencha a descrição.', 'error'); return; }
+      if (!descricao) { Toast.show('Preencha a descricao.', 'error'); return; }
       const dataObj = data || new Date().toISOString().slice(0, 10);
       const payload = { descricao, valor, data: dataObj, categoria: document.getElementById('f-categoria').value };
-      if (item) {
-        Storage.update(COLLECTION, item.id, payload);
-        Toast.show('Gasto atualizado.', 'success');
-      } else {
-        const newId = Storage.nextId(COLLECTION);
-        Storage.add(COLLECTION, { id: newId, ...payload, createdAt: new Date().toISOString() });
-        Toast.show('Gasto registrado.', 'success');
+      try {
+        if (item) {
+          await Storage.update(COLLECTION, item.id, payload);
+          Toast.show('Gasto atualizado.', 'success');
+        } else {
+          const newItem = await Storage.add(COLLECTION, { ...payload, createdAt: new Date().toISOString() });
+          Toast.show('Gasto registrado.', 'success');
+        }
+        closeModal();
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      } catch (err) {
+        Toast.show(err.message || 'Erro ao salvar.', 'error');
       }
-      closeModal();
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
     };
     overlay.classList.add('open');
   }
 
-  function deleteItem(id) {
-    const item = collection().find(e => e.id === id);
+  async function deleteItem(id) {
+    const item = await Storage.find(COLLECTION, e => e.id === id);
     if (!item) return;
     if (!confirm(`Excluir o gasto ${item.descricao} (R$ ${item.valor})?`)) return;
-    Storage.remove(COLLECTION, id);
-    Toast.show('Gasto excluído.', 'success');
-    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    try {
+      await Storage.remove(COLLECTION, id);
+      Toast.show('Gasto excluido.', 'success');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    } catch (err) {
+      Toast.show(err.message || 'Erro ao excluir.', 'error');
+    }
   }
 
   function closeModal() {

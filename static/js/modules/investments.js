@@ -4,22 +4,21 @@
 const InvestmentsModule = (() => {
   const COLLECTION = 'investments';
 
-  function collection() { return Storage.get(COLLECTION, []); }
-  function save(items) { Storage.set(COLLECTION, items); }
+  function collection() { return Storage.get(COLLECTION); }
 
-  function renderList(container) {
-    const items = collection();
+  async function renderList(container) {
+    const items = await Storage.get(COLLECTION);
     container.innerHTML = `
       <div class="header">
         <div>
           <h1>Investimentos</h1>
-          <p class="subtitle">Controle de aplicações e investimentos.</p>
+          <p class="subtitle">Controle de aplicacoes e investimentos.</p>
         </div>
         <button class="btn btn-primary" onclick="InvestmentsModule.openForm()"><i class="fas fa-plus"></i> Novo investimento</button>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Data</th><th>Nome</th><th>Tipo</th><th>Valor</th><th>Lucro</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Data</th><th>Nome</th><th>Tipo</th><th>Valor</th><th>Lucro</th><th>Acoes</th></tr></thead>
           <tbody>
             ${items.map(inv => `
               <tr>
@@ -49,7 +48,7 @@ const InvestmentsModule = (() => {
     document.getElementById('modal-body').innerHTML = `
       <div class="form-group">
         <label>Nome *</label>
-        <input id="f-nome" type="text" placeholder="Ex: CDB, Ações, Fundo Imobiliário" />
+        <input id="f-nome" type="text" placeholder="Ex: CDB, Acoes, Fundo Imobiliario" />
       </div>
       <div class="form-group">
         <label>Tipo</label>
@@ -58,7 +57,7 @@ const InvestmentsModule = (() => {
           <option value="CDB">CDB</option>
           <option value="LTN">LTN</option>
           <option value="LCI/LCA">LCI / LCA</option>
-          <option value="Ações">Ações</option>
+          <option value="Acoes">Acoes</option>
           <option value="Fundos de Investimento">Fundos de Investimento</option>
           <option value="Outro">Outro</option>
         </select>
@@ -76,13 +75,13 @@ const InvestmentsModule = (() => {
         <input id="f-lucro" type="number" step="0.01" min="0" placeholder="0,00" />
       </div>
       <div class="form-group">
-        <label>Observações</label>
-        <textarea id="f-obs" rows="2" placeholder="Observações"></textarea>
+        <label>Observacoes</label>
+        <textarea id="f-obs" rows="2" placeholder="Observacoes"></textarea>
       </div>
     `;
     document.getElementById('modal-submit').textContent = item ? 'Atualizar' : 'Salvar';
 
-    document.getElementById('modal-submit').onclick = () => {
+    document.getElementById('modal-submit').onclick = async () => {
       const nome = document.getElementById('f-nome').value.trim();
       const valor = parseFloat(document.getElementById('f-valor').value) || 0;
       if (!nome) { Toast.show('Preencha o nome.', 'error'); return; }
@@ -95,27 +94,34 @@ const InvestmentsModule = (() => {
         lucro: document.getElementById('f-lucro').value ? parseFloat(document.getElementById('f-lucro').value) : undefined,
         obs: document.getElementById('f-obs').value.trim(),
       };
-      if (item) {
-        Storage.update(COLLECTION, item.id, payload);
-        Toast.show('Investimento atualizado.', 'success');
-      } else {
-        const newId = Storage.nextId(COLLECTION);
-        Storage.add(COLLECTION, { id: newId, ...payload, createdAt: new Date().toISOString() });
-        Toast.show('Investimento registrado.', 'success');
+      try {
+        if (item) {
+          await Storage.update(COLLECTION, item.id, payload);
+          Toast.show('Investimento atualizado.', 'success');
+        } else {
+          const newItem = await Storage.add(COLLECTION, { ...payload, createdAt: new Date().toISOString() });
+          Toast.show('Investimento registrado.', 'success');
+        }
+        closeModal();
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      } catch (err) {
+        Toast.show(err.message || 'Erro ao salvar.', 'error');
       }
-      closeModal();
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
     };
     overlay.classList.add('open');
   }
 
-  function deleteItem(id) {
-    const item = collection().find(i => i.id === id);
+  async function deleteItem(id) {
+    const item = await Storage.find(COLLECTION, i => i.id === id);
     if (!item) return;
     if (!confirm(`Excluir o investimento ${item.nome}?`)) return;
-    Storage.remove(COLLECTION, id);
-    Toast.show('Investimento excluído.', 'success');
-    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    try {
+      await Storage.remove(COLLECTION, id);
+      Toast.show('Investimento excluido.', 'success');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    } catch (err) {
+      Toast.show(err.message || 'Erro ao excluir.', 'error');
+    }
   }
 
   function closeModal() {
