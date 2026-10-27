@@ -24,7 +24,6 @@ window.registerUser = async function (username, email, password) {
   });
 
   if (error) {
-    // Trata erros comuns
     if (error.message && error.message.includes('already registered')) {
       return { error: "Este email já está registrado. Tente fazer login." };
     }
@@ -49,8 +48,6 @@ window.loginUser = async function (email, password) {
   });
 
   if (error) {
-    // Tenta recuperar o usuário por username se o e-mail não bateu
-    // (suporte a login por username em vez de e-mail)
     const { data: userData, error: userError } = await window.supabase.auth.getUser();
     if (userError) return { error: userError.message };
 
@@ -78,8 +75,8 @@ window.logout = async function () {
 // --------------------------------------------------------------------------
 // Checa se o usuário está autenticado
 // --------------------------------------------------------------------------
-window.isAuthenticated = function () {
-  const { data: { session } } = window.supabase.auth.getSession();
+window.isAuthenticated = async function () {
+  const { data: { session } } = await window.supabase.auth.getSession();
   return !!session;
 };
 
@@ -102,8 +99,8 @@ window.getSession = async function () {
 // --------------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------------
-window.getToken = function () {
-  const { data: { session } } = window.supabase.auth.getSession();
+window.getToken = async function () {
+  const { data: { session } } = await window.supabase.auth.getSession();
   return session?.access_token || null;
 };
 

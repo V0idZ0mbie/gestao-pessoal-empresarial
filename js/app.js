@@ -2,15 +2,15 @@
 // Navegação por hash: #/dashboard, #/accounts, #/login, #/register etc.
 
 const ROUTES = {
-  dashboard: { view: 'DashboardView', icon: 'fa-home', needsAuth: true },
-  accounts: { view: 'AccountsModule', icon: 'fa-university', needsAuth: true },
-  clients: { view: 'ClientsModule', icon: 'fa-users', needsAuth: true },
-  expenses: { view: 'ExpensesModule', icon: 'fa-shopping-cart', needsAuth: true },
-  investments: { view: 'InvestmentsModule', icon: 'fa-chart-line', needsAuth: true },
-  'service-orders': { view: 'ServiceOrdersModule', icon: 'fa-tasks', needsAuth: true },
-  cadastros: { view: 'ClientsModule', icon: 'fa-folder', needsAuth: true },
-  login: { view: 'AuthViews.renderLogin', icon: 'fa-sign-in-alt', needsAuth: false },
-  register: { view: 'AuthViews.renderRegister', icon: 'fa-user-plus', needsAuth: false },
+  dashboard: { view: DashboardView, icon: 'fa-home', needsAuth: true },
+  accounts: { view: AccountsModule, icon: 'fa-university', needsAuth: true },
+  clients: { view: ClientsModule, icon: 'fa-users', needsAuth: true },
+  expenses: { view: ExpensesModule, icon: 'fa-shopping-cart', needsAuth: true },
+  investments: { view: InvestmentsModule, icon: 'fa-chart-line', needsAuth: true },
+  'service-orders': { view: ServiceOrdersModule, icon: 'fa-tasks', needsAuth: true },
+  cadastros: { view: ClientsModule, icon: 'fa-folder', needsAuth: true },
+  login: { view: AuthViews.renderLogin, icon: 'fa-sign-in-alt', needsAuth: false },
+  register: { view: AuthViews.renderRegister, icon: 'fa-user-plus', needsAuth: false },
 };
 
 const App = {
@@ -29,25 +29,37 @@ const App = {
     const route = this.getRoute();
     const routeInfo = ROUTES[route] || ROUTES.dashboard;
 
-    // Redireciona para login se a rota requer auth e não está autenticado
-    if (routeInfo.needsAuth && !window.isAuthenticated()) {
-      window.location.hash = '/login';
-      return;
+    // Se já estamos na rota login, apenas aguardar autenticação não é necessário
+    if (routeInfo.needsAuth) {
+      const isAuth = await window.isAuthenticated();
+      if (!isAuth) {
+        window.location.hash = '/login';
+        return;
+      }
     }
-    // Redireciona para dashboard se já estiver autenticado em login/register
-    if (!routeInfo.needsAuth && window.isAuthenticated()) {
-      window.location.hash = '/dashboard';
-      return;
+    // Se estamos na rota login/register e já está autenticado, redirecionar para dashboard
+    if (!routeInfo.needsAuth) {
+      const isAuth = await window.isAuthenticated();
+      if (isAuth) {
+        window.location.hash = '/dashboard';
+        return;
+      }
     }
 
     const container = document.getElementById('main-content');
-    const View = window[routeInfo.view];
     let renderFn;
 
-    if (typeof View === 'function') {
-      renderFn = View;
-    } else if (View && typeof View === 'object' && window[View] && typeof window[View].render === 'function') {
-      renderFn = window[View].render;
+    // View pode ser: função, string (nome da propriedade), ou objeto {view, render}
+    if (typeof routeInfo.view === 'function') {
+      renderFn = routeInfo.view;
+    } else if (typeof routeInfo.view === 'string') {
+      // Ex: 'DashboardView', 'AccountsModule'
+      const View = window[routeInfo.view];
+      if (View && typeof View.render === 'function') {
+        renderFn = View.render;
+      }
+    } else if (typeof routeInfo.view === 'object' && window[routeInfo.view] && typeof window[routeInfo.view].render === 'function') {
+      renderFn = window[routeInfo.view].render;
     }
 
     if (renderFn) {

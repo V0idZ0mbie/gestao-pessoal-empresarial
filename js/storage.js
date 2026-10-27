@@ -102,20 +102,27 @@ const Storage = {
 };
 
 // --------------------------------------------------------------------------
-// Expoe o token JWT para os módulos
+// Expoe o token JWT para os módulos (assíncrono)
 // --------------------------------------------------------------------------
-window.getToken = function () {
-  return sessionStorage.getItem("gp_token");
+window.getToken = async function () {
+  const { data: { session } } = await window.supabase.auth.getSession();
+  return session?.access_token || null;
 };
 
-window.setToken = function (token) {
-  sessionStorage.setItem("gp_token", token);
+// --------------------------------------------------------------------------
+// Checa se o usuário está autenticado (assíncrono)
+// --------------------------------------------------------------------------
+window.isAuthenticated = async function () {
+  const token = await getToken();
+  return !!token;
 };
 
-window.clearToken = function () {
-  sessionStorage.removeItem("gp_token");
-};
-
-window.isAuthenticated = function () {
-  return !!getToken();
+// --------------------------------------------------------------------------
+// Sincroniza o estado de autenticação com Supabase
+// --------------------------------------------------------------------------
+window.ensureAuthState = async function () {
+  const { data: { session } } = await window.supabase.auth.getSession();
+  if (session) {
+    sessionStorage.setItem("gp_userId", session.user.id);
+  }
 };
