@@ -8,6 +8,7 @@ const ROUTES = {
   expenses: { view: ExpensesModule, title: 'Controle de Gastos', icon: 'fa-receipt', needsAuth: true },
   investments: { view: InvestmentsModule, title: 'Gestão de Investimentos', icon: 'fa-piggy-bank', needsAuth: true },
   'service-orders': { view: ServiceOrdersModule, title: 'Ordens de Serviço', icon: 'fa-clipboard-check', needsAuth: true },
+  services: { view: ServicesCatalogModule, title: 'Tabela de Serviços & Valores Médios', icon: 'fa-calculator', needsAuth: true },
   cadastros: { view: ClientsModule, title: 'Cadastros Gerais', icon: 'fa-users', needsAuth: true },
   login: { view: AuthViews.renderLogin, title: 'Login no Sistema', icon: 'fa-sign-in-alt', needsAuth: false },
   register: { view: AuthViews.renderRegister, title: 'Criar Nova Conta', icon: 'fa-user-plus', needsAuth: false },

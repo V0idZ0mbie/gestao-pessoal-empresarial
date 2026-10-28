@@ -28,11 +28,16 @@ const DashboardView = {
       <div class="header">
         <div>
           <h1>Dashboard Geral</h1>
-          <p class="subtitle">Acompanhe a saúde financeira e operacional do seu negócio</p>
+          <p class="subtitle">Acompanhe a saúde financeira, clientes e histórico de ordens</p>
         </div>
-        <button class="btn btn-primary" onclick="DashboardView.onImportSeed()">
-          <i class="fas fa-magic"></i> Importar Dados Demo
-        </button>
+        <div style="display:flex;gap:10px;">
+          <a href="#/services" class="btn btn-ghost">
+            <i class="fas fa-calculator"></i> Ver Tabela de Médias
+          </a>
+          <button class="btn btn-primary" onclick="DashboardView.onImportSeed()">
+            <i class="fas fa-database"></i> Sincronizar Banco Migrado
+          </button>
+        </div>
       </div>
 
       <div class="cards">
@@ -153,17 +158,17 @@ const DashboardView = {
   },
 
   async onImportSeed() {
-    if (!confirm('Deseja importar dados fictícios de demonstração para testar o sistema?')) return;
+    if (!confirm('Deseja carregar a base de dados migrada (71 clientes, 321 serviços e tabela de valores médios)?')) return;
     try {
       if (window.SeedData && typeof window.SeedData.importAll === 'function') {
         await window.SeedData.importAll();
-        Toast.show('Dados de exemplo importados com sucesso!', 'success');
+        Toast.show('Banco de dados migrado com sucesso para o sistema!', 'success');
         window.dispatchEvent(new HashChangeEvent('hashchange'));
       } else {
-        Toast.show('Módulo de semente de dados não encontrado.', 'error');
+        Toast.show('Módulo de migração não encontrado.', 'error');
       }
     } catch (err) {
-      Toast.show('Erro ao importar dados: ' + err.message, 'error');
+      Toast.show('Erro ao migrar dados: ' + err.message, 'error');
     }
   }
 };
