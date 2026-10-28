@@ -6,6 +6,10 @@
   <base href="./" />
   <title>Gestão Pessoal & Empresarial</title>
   <link rel="stylesheet" href="css/style.css" />
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Font Awesome (ícones) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
@@ -13,21 +17,25 @@
   <!-- ===== Layout principal ===== -->
   <div class="app">
     <!-- Menu lateral -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="logo">
-          <i class="fas fa-warehouse"></i>
-          <span>GestãoPro</span>
+          <div class="logo-icon">
+            <i class="fas fa-chart-pie"></i>
+          </div>
+          <span class="logo-text">Gestão<span>Pro</span></span>
         </div>
-        <button id="menu-toggle" class="icon-btn" aria-label="Fechar menu">
+        <button id="menu-toggle" class="icon-btn mobile-only" aria-label="Fechar menu">
           <i class="fas fa-times"></i>
         </button>
       </div>
+
       <nav class="sidebar-nav">
+        <div class="nav-section-title">MENU PRINCIPAL</div>
         <ul>
           <li>
             <a href="#/dashboard" class="nav-link active">
-              <i class="fas fa-home"></i> <span>Dashboard</span>
+              <i class="fas fa-chart-line"></i> <span>Dashboard</span>
             </a>
           </li>
           <li>
@@ -42,35 +50,65 @@
           </li>
           <li>
             <a href="#/expenses" class="nav-link">
-              <i class="fas fa-shopping-cart"></i> <span>Gastos</span>
+              <i class="fas fa-receipt"></i> <span>Gastos</span>
             </a>
           </li>
           <li>
             <a href="#/investments" class="nav-link">
-              <i class="fas fa-chart-line"></i> <span>Investimentos</span>
+              <i class="fas fa-piggy-bank"></i> <span>Investimentos</span>
             </a>
           </li>
           <li>
             <a href="#/service-orders" class="nav-link">
-              <i class="fas fa-tasks"></i> <span>Ordens de Serviço</span>
-            </a>
-          </li>
-          <li>
-            <a href="#/cadastros" class="nav-link">
-              <i class="fas fa-folder"></i> <span>Cadastros</span>
+              <i class="fas fa-clipboard-check"></i> <span>Ordens de Serviço</span>
             </a>
           </li>
         </ul>
       </nav>
+
       <div class="sidebar-footer">
-        <small>Versão 1.0.0</small>
+        <div class="user-profile-badge" id="user-profile-badge">
+          <div class="user-avatar" id="user-avatar">
+            <i class="fas fa-user"></i>
+          </div>
+          <div class="user-details">
+            <span class="user-name" id="user-name-display">Usuário</span>
+            <span class="user-email" id="user-email-display">online</span>
+          </div>
+          <button class="logout-btn" id="logout-btn" title="Sair da conta">
+            <i class="fas fa-sign-out-alt"></i>
+          </button>
+        </div>
       </div>
     </aside>
 
-    <!-- Conteúdo principal -->
-    <main class="main" id="main-content">
-      <!-- O conteúdo é renderizado aqui -->
-    </main>
+    <!-- Overlay mobile para fechar sidebar clicando fora -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <!-- Conteúdo principal envelopado com Topbar -->
+    <div class="main-wrapper">
+      <header class="topbar" id="topbar">
+        <div class="topbar-left">
+          <button id="menu-open-btn" class="icon-btn mobile-only" aria-label="Abrir menu">
+            <i class="fas fa-bars"></i>
+          </button>
+          <div class="breadcrumb" id="topbar-breadcrumb">
+            <i class="fas fa-compass"></i>
+            <span id="page-title-badge">Painel de Controle</span>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button class="theme-toggle" id="global-theme-toggle" title="Alternar tema claro/escuro">
+            <i class="fas fa-moon"></i>
+          </button>
+        </div>
+      </header>
+
+      <main class="main" id="main-content">
+        <!-- O conteúdo é renderizado aqui -->
+      </main>
+    </div>
   </div>
 
   <!-- ===== Modal genérico ===== -->
@@ -78,7 +116,7 @@
     <div class="modal" id="modal">
       <div class="modal-header">
         <h2 id="modal-title">Título</h2>
-        <button id="modal-close" class="icon-btn"><i class="fas fa-times"></i></button>
+        <button id="modal-close" class="icon-btn" aria-label="Fechar"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body" id="modal-body">
         <!-- Formulários são injetados aqui -->
@@ -97,13 +135,15 @@
   <!-- Supabase (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Supabase configuration -->
-  
-  <!-- Auth helpers (Supabase Auth) -->
-  <script src="js/auth.js"></script>
+  <script src="js/supabase.js"></script>
   <!-- Toast notifications -->
   <script src="js/toast.js"></script>
+  <!-- Auth helpers (Supabase Auth) -->
+  <script src="js/auth.js"></script>
   <!-- Storage API (Supabase) -->
   <script src="js/storage.js"></script>
+  <!-- Seed data para importação demo -->
+  <script src="js/seed.js"></script>
   <!-- Dashboard view -->
   <script src="js/views/dashboard.js"></script>
   <!-- Auth views (login/register) -->
@@ -115,8 +155,7 @@
   <script src="js/modules/investments.js"></script>
   <script src="js/modules/service-orders.js"></script>
   
-    <!-- Main application (router) -->
+  <!-- Main application (router) -->
   <script src="js/app.js"></script>
-
 </body>
 </html>

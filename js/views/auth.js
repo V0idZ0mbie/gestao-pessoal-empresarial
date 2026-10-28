@@ -1,322 +1,344 @@
-// ===== Views de Login e Cadastro (Supabase + Tema) =====
-
-// --------------------------------------------------------------------------
-// Sistema de Tema
-// --------------------------------------------------------------------------
-const ThemeManager = {
-  // Tema padrão: sistema ou 'light'
-  getDefaultTheme() {
-    const stored = sessionStorage.getItem('gp_theme');
-    if (stored === 'light' || stored === 'dark') return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  },
-
-  // Inicializa o tema
-  init() {
-    const theme = this.getDefaultTheme();
-    document.documentElement.setAttribute('data-theme', theme);
-    sessionStorage.setItem('gp_theme', theme);
-    return theme;
-  },
-
-  // Alterna entre claro e escuro
-  toggle() {
-    const current = document.documentElement.getAttribute('data-theme');
-    const next = current === 'light' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', next);
-    sessionStorage.setItem('gp_theme', next);
-    return next;
-  },
-
-  // Força um tema
-  set(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    sessionStorage.setItem('gp_theme', theme);
-  }
-};
-
-// ViewModel para o login
-const AuthViewModel = {
-  loading: false,
-
-  // Valida o formulário de login
-  validateEmail(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  },
-
-  // Valida o formulário
-  validate() {
-    const email = document.getElementById('f-email')?.value.trim() || '';
-    const password = document.getElementById('f-pass')?.value || '';
-    let valid = true;
-
-    if (!email) {
-      document.getElementById('f-email').closest('.form-group').classList.add('error');
-      valid = false;
-    } else {
-      document.getElementById('f-email').closest('.form-group').classList.remove('error');
-    }
-
-    if (!password) {
-      document.getElementById('f-pass').closest('.form-group').classList.add('error');
-      valid = false;
-    } else {
-      document.getElementById('f-pass').closest('.form-group').classList.remove('error');
-    }
-
-    return valid;
-  },
-
-  // Enviar login
-  async login(email, password) {
-    if (this.loading) return;
-    this.loading = true;
-
-    const btn = document.getElementById('login-form')?.querySelector('.btn-login');
-    if (btn) {
-      btn.classList.add('loading');
-      btn.querySelector('.btn-text').style.display = 'none';
-      btn.querySelector('.spinner').style.display = 'block';
-    }
-
-    try {
-      const res = await window.loginUser(email, password);
-      this.loading = false;
-      if (res.error) throw new Error(res.error);
-      await ThemeManager.init();
-      Toast.show('Login realizado com sucesso!', 'success');
-      window.location.hash = '/dashboard';
-    } catch (err) {
-      this.loading = false;
-      Toast.show(err.message || 'Erro no login', 'error');
-    }
-  }
-};
+// ============= Views de Autenticação (Login e Registro) =============
 
 const AuthViews = {
-  // Renderiza a página de login
   renderLogin(container) {
     container.innerHTML = `
       <div class="login-page">
-        <div class="login-bg">
-          <div class="float float-1"></div>
-          <div class="float float-2"></div>
-          <div class="float float-3"></div>
-        </div>
+        <div class="login-bg"></div>
 
-        <!-- Alternador de tema -->
-        <button class="theme-toggle" id="theme-toggle" title="Alternar tema">
+        <button class="theme-toggle auth-theme-toggle" id="auth-theme-toggle" title="Alternar tema">
           <i class="fas fa-moon"></i>
         </button>
 
-        <!-- Card do Login -->
         <div class="login-card">
           <div class="logo">
-            <i class="fas fa-warehouse"></i>
+            <div class="logo-icon">
+              <i class="fas fa-chart-pie"></i>
+            </div>
             <div>
               <h1>GestãoPro</h1>
-              <p>Sistema de Gestão Pessoal & Empresarial</p>
+              <p>Acesse sua plataforma integrada</p>
             </div>
           </div>
 
           <form class="login-form" id="login-form" novalidate>
             <div class="form-group">
               <label for="f-email">E-mail</label>
-              <input
-                id="f-email"
-                type="email"
-                placeholder="seu@email.com"
-                autocomplete="email"
-                required
-              />
+              <div class="input-with-icon">
+                <i class="fas fa-envelope"></i>
+                <input
+                  id="f-email"
+                  type="email"
+                  placeholder="exemplo@gestaopro.com"
+                  autocomplete="email"
+                  required
+                />
+              </div>
             </div>
 
             <div class="form-group">
-              <label for="f-pass">Senha</label>
-              <input
-                id="f-pass"
-                type="password"
-                placeholder="Sua senha"
-                autocomplete="current-password"
-                required
-              />
+              <label for="f-pass">Senha de Acesso</label>
+              <div class="input-with-icon">
+                <i class="fas fa-lock"></i>
+                <input
+                  id="f-pass"
+                  type="password"
+                  placeholder="Sua senha secreta"
+                  autocomplete="current-password"
+                  required
+                />
+                <button type="button" class="toggle-password-btn" id="toggle-login-pass" title="Mostrar/ocultar senha">
+                  <i class="fas fa-eye"></i>
+                </button>
+              </div>
             </div>
 
             <button type="submit" class="btn-login" id="login-submit">
               <span class="spinner"></span>
-              <span class="btn-text">Entrar</span>
+              <span class="btn-text"><i class="fas fa-sign-in-alt"></i> Entrar no Sistema</span>
             </button>
 
+            <div class="demo-credentials-box">
+              <span><strong>💡 Acesso Rápido de Demonstração:</strong></span>
+              <span>E-mail: <code>admin@gestao.com</code></span>
+              <span>Senha: <code>123456</code></span>
+            </div>
+
             <p class="login-alternative">
-              Não tem conta? <a href="#/register">Crie sua conta grátis</a>
+              Não possui uma conta? <a href="#/register">Cadastre-se gratuitamente</a>
             </p>
           </form>
         </div>
       </div>
     `;
 
-    // Alternador de tema
-    const themeToggle = document.getElementById('theme-toggle');
-    if (themeToggle) {
-      themeToggle.addEventListener('click', () => {
-        ThemeManager.toggle();
-        const icon = themeToggle.querySelector('i');
-        icon.classList.toggle('fa-moon');
-        icon.classList.toggle('fa-sun');
-      });
-    }
+    // Toggle de visibilidade de senha
+    const togglePassBtn = document.getElementById('toggle-login-pass');
+    const passInput = document.getElementById('f-pass');
+    togglePassBtn?.addEventListener('click', () => {
+      const isPass = passInput.type === 'password';
+      passInput.type = isPass ? 'text' : 'password';
+      togglePassBtn.querySelector('i').className = isPass ? 'fas fa-eye-slash' : 'fas fa-eye';
+    });
 
-    // Submissão do formulário
+    // Toggle de tema na tela de auth
+    const themeBtn = document.getElementById('auth-theme-toggle');
+    themeBtn?.addEventListener('click', () => {
+      window.App.toggleTheme();
+    });
+
+    // Form submit
     const form = document.getElementById('login-form');
     if (form) {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!AuthViewModel.validate()) {
-          Toast.show('Preencha todos os campos.', 'error');
+        const emailInput = document.getElementById('f-email');
+        const submitBtn = document.getElementById('login-submit');
+
+        const email = emailInput.value.trim();
+        const pass = passInput.value;
+
+        if (!email || !pass) {
+          Toast.show('Preencha seu e-mail e senha para continuar.', 'error');
           return;
         }
-        const email = document.getElementById('f-email').value.trim();
-        const password = document.getElementById('f-pass').value;
-        await AuthViewModel.login(email, password);
+
+        submitBtn.classList.add('loading');
+
+        try {
+          const res = await window.loginUser(email, pass);
+          if (res.error) {
+            Toast.show(res.error, 'error');
+            submitBtn.classList.remove('loading');
+            return;
+          }
+
+          Toast.show('Login realizado com sucesso! Bem-vindo.', 'success');
+          window.location.hash = '/dashboard';
+        } catch (err) {
+          Toast.show('Falha ao autenticar: ' + err.message, 'error');
+          submitBtn.classList.remove('loading');
+        }
       });
     }
-
-    // Animações de entrada
-    requestAnimationFrame(() => {
-      const card = document.querySelector('.login-card');
-      if (card) {
-        card.style.opacity = '0';
-        card.style.transform = 'translateY(20px)';
-        setTimeout(() => {
-          card.style.transition = 'opacity .4s ease, transform .4s ease';
-          card.style.opacity = '1';
-          card.style.transform = 'translateY(0)';
-        }, 50);
-      }
-    });
   },
 
-  // Renderiza a página de cadastro
   renderRegister(container) {
     container.innerHTML = `
       <div class="login-page">
-        <div class="login-bg">
-          <div class="float float-1"></div>
-          <div class="float float-2"></div>
-          <div class="float float-3"></div>
-        </div>
+        <div class="login-bg"></div>
 
-        <button class="theme-toggle" id="theme-toggle" title="Alternar tema">
+        <button class="theme-toggle auth-theme-toggle" id="auth-theme-toggle" title="Alternar tema">
           <i class="fas fa-moon"></i>
         </button>
 
         <div class="login-card">
           <div class="logo">
-            <i class="fas fa-warehouse"></i>
+            <div class="logo-icon">
+              <i class="fas fa-chart-pie"></i>
+            </div>
             <div>
               <h1>GestãoPro</h1>
-              <p>Crie sua conta grátis</p>
+              <p>Crie sua conta em segundos</p>
             </div>
           </div>
 
           <form class="login-form" id="register-form" novalidate>
             <div class="form-group">
+              <label for="f-user">Nome Completo</label>
+              <div class="input-with-icon">
+                <i class="fas fa-user"></i>
+                <input
+                  id="f-user"
+                  type="text"
+                  placeholder="Ex: João da Silva"
+                  autocomplete="name"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
               <label for="f-email">E-mail</label>
-              <input
-                id="f-email"
-                type="email"
-                placeholder="seu@email.com"
-                autocomplete="email"
-                required
-              />
+              <div class="input-with-icon">
+                <i class="fas fa-envelope"></i>
+                <input
+                  id="f-email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  autocomplete="email"
+                  required
+                />
+              </div>
             </div>
 
             <div class="form-group">
-              <label for="f-user">Usuário</label>
-              <input
-                id="f-user"
-                type="text"
-                placeholder="Seu nome de usuário"
-                autocomplete="username"
-                required
-              />
+              <label for="f-pass">Senha de Acesso (mínimo 6 caracteres)</label>
+              <div class="input-with-icon">
+                <i class="fas fa-lock"></i>
+                <input
+                  id="f-pass"
+                  type="password"
+                  placeholder="Crie uma senha segura"
+                  autocomplete="new-password"
+                  minlength="6"
+                  required
+                />
+                <button type="button" class="toggle-password-btn" id="toggle-reg-pass" title="Mostrar/ocultar senha">
+                  <i class="fas fa-eye"></i>
+                </button>
+              </div>
+              <!-- Indicador de força de senha -->
+              <div class="password-strength-meter" id="pass-strength-meter">
+                <div class="strength-bar"><div class="strength-fill" id="strength-fill"></div></div>
+                <span class="strength-text" id="strength-text">Digite sua senha</span>
+              </div>
             </div>
 
             <div class="form-group">
-              <label for="f-pass">Senha</label>
-              <input
-                id="f-pass"
-                type="password"
-                placeholder="Mínimo 6 caracteres"
-                autocomplete="new-password"
-                minlength="6"
-                required
-              />
+              <label for="f-pass-confirm">Confirmar Senha</label>
+              <div class="input-with-icon">
+                <i class="fas fa-check-double"></i>
+                <input
+                  id="f-pass-confirm"
+                  type="password"
+                  placeholder="Repita a senha digitada"
+                  autocomplete="new-password"
+                  minlength="6"
+                  required
+                />
+              </div>
+              <small class="field-error" id="confirm-pass-error" style="display:none;color:var(--danger);font-size:12px;margin-top:4px;">As senhas não coincidem.</small>
             </div>
 
             <button type="submit" class="btn-login" id="register-submit">
               <span class="spinner"></span>
-              <span class="btn-text">Criar conta</span>
+              <span class="btn-text"><i class="fas fa-user-plus"></i> Finalizar Cadastro</span>
             </button>
 
             <p class="login-alternative">
-              Já tem conta? <a href="#/login">Fazer login</a>
+              Já possui uma conta? <a href="#/login">Clique aqui para entrar</a>
             </p>
           </form>
         </div>
       </div>
     `;
 
-    // Alternador de tema
-    const themeToggle = document.getElementById('theme-toggle');
-    if (themeToggle) {
-      themeToggle.addEventListener('click', () => {
-        ThemeManager.toggle();
-        const icon = themeToggle.querySelector('i');
-        icon.classList.toggle('fa-moon');
-        icon.classList.toggle('fa-sun');
-      });
-    }
+    // Toggle de visibilidade da senha
+    const togglePassBtn = document.getElementById('toggle-reg-pass');
+    const passInput = document.getElementById('f-pass');
+    const confirmInput = document.getElementById('f-pass-confirm');
+    const confirmError = document.getElementById('confirm-pass-error');
+    const strengthFill = document.getElementById('strength-fill');
+    const strengthText = document.getElementById('strength-text');
 
-    // Submissão do formulário
+    togglePassBtn?.addEventListener('click', () => {
+      const isPass = passInput.type === 'password';
+      passInput.type = isPass ? 'text' : 'password';
+      togglePassBtn.querySelector('i').className = isPass ? 'fas fa-eye-slash' : 'fas fa-eye';
+    });
+
+    // Medidor de força de senha
+    passInput?.addEventListener('input', () => {
+      const val = passInput.value;
+      let score = 0;
+      if (val.length >= 6) score++;
+      if (/[A-Z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+
+      strengthFill.className = 'strength-fill';
+      if (!val) {
+        strengthFill.style.width = '0%';
+        strengthText.textContent = 'Digite sua senha';
+        strengthText.style.color = 'var(--text-dim)';
+      } else if (score <= 1) {
+        strengthFill.classList.add('weak');
+        strengthFill.style.width = '25%';
+        strengthText.textContent = 'Senha fraca';
+        strengthText.style.color = 'var(--danger)';
+      } else if (score === 2) {
+        strengthFill.classList.add('medium');
+        strengthFill.style.width = '50%';
+        strengthText.textContent = 'Senha média';
+        strengthText.style.color = 'var(--warning)';
+      } else if (score === 3) {
+        strengthFill.classList.add('good');
+        strengthFill.style.width = '75%';
+        strengthText.textContent = 'Senha boa';
+        strengthText.style.color = 'var(--primary)';
+      } else {
+        strengthFill.classList.add('strong');
+        strengthFill.style.width = '100%';
+        strengthText.textContent = 'Senha excelente!';
+        strengthText.style.color = 'var(--success)';
+      }
+    });
+
+    // Verificação em tempo real de confirmação de senha
+    confirmInput?.addEventListener('input', () => {
+      if (confirmInput.value && confirmInput.value !== passInput.value) {
+        confirmError.style.display = 'block';
+      } else {
+        confirmError.style.display = 'none';
+      }
+    });
+
+    // Toggle de tema na tela de auth
+    const themeBtn = document.getElementById('auth-theme-toggle');
+    themeBtn?.addEventListener('click', () => {
+      window.App.toggleTheme();
+    });
+
+    // Form submit
     const form = document.getElementById('register-form');
     if (form) {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!AuthViewModel.validate()) {
-          Toast.show('Preencha todos os campos.', 'error');
+        const userInput = document.getElementById('f-user');
+        const emailInput = document.getElementById('f-email');
+        const submitBtn = document.getElementById('register-submit');
+
+        const username = userInput.value.trim();
+        const email = emailInput.value.trim();
+        const pass = passInput.value;
+        const confirmPass = confirmInput.value;
+
+        if (!username || !email || !pass) {
+          Toast.show('Preencha todos os campos do formulário.', 'error');
           return;
         }
-        const email = document.getElementById('f-email').value.trim();
-        const username = document.getElementById('f-user').value.trim();
-        const password = document.getElementById('f-pass').value;
-        if (!password || password.length < 6) {
-          Toast.show('A senha deve ter pelo menos 6 caracteres.', 'error');
+
+        if (pass.length < 6) {
+          Toast.show('A senha deve possuir no mínimo 6 dígitos.', 'error');
           return;
         }
+
+        if (pass !== confirmPass) {
+          Toast.show('A confirmação de senha não coincide com a senha digitada.', 'error');
+          confirmError.style.display = 'block';
+          return;
+        }
+
+        submitBtn.classList.add('loading');
+
         try {
-          const res = await window.registerUser(username, email, password);
-          if (res.error) throw new Error(res.error);
-          Toast.show('Conta criada! Faça login.', 'success');
+          const res = await window.registerUser(username, email, pass);
+          if (res.error) {
+            Toast.show(res.error, 'error');
+            submitBtn.classList.remove('loading');
+            return;
+          }
+
+          Toast.show('Conta criada com sucesso! Faça login para começar.', 'success');
           window.location.hash = '/login';
         } catch (err) {
-          Toast.show(err.message || 'Erro no cadastro', 'error');
+          Toast.show('Falha ao registrar conta: ' + err.message, 'error');
+          submitBtn.classList.remove('loading');
         }
       });
     }
-
-    // Animação
-    requestAnimationFrame(() => {
-      const card = document.querySelector('.login-card');
-      if (card) {
-        card.style.opacity = '0';
-        card.style.transform = 'translateY(20px)';
-        setTimeout(() => {
-          card.style.transition = 'opacity .4s ease, transform .4s ease';
-          card.style.opacity = '1';
-          card.style.transform = 'translateY(0)';
-        }, 50);
-      }
-    });
   }
 };
+
+window.AuthViews = AuthViews;
