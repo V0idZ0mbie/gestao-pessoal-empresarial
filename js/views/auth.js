@@ -59,9 +59,11 @@ const AuthViews = {
             </button>
 
             <div class="demo-credentials-box">
-              <span><strong>💡 Acesso Rápido de Demonstração:</strong></span>
-              <span>E-mail: <code>admin@gestao.com</code></span>
-              <span>Senha: <code>123456</code></span>
+              <span><strong>💡 Acesso Rápido de Testes:</strong></span>
+              <span>E-mail: <code>admin@gestao.com</code> &nbsp;|&nbsp; Senha: <code>123456</code></span>
+              <button type="button" class="btn btn-sm btn-ghost" id="quick-fill-btn" style="margin-top:6px;width:100%;font-size:12px;padding:5px;">
+                <i class="fas fa-magic"></i> Preencher dados de teste e Entrar
+              </button>
             </div>
 
             <p class="login-alternative">
@@ -85,6 +87,17 @@ const AuthViews = {
     const themeBtn = document.getElementById('auth-theme-toggle');
     themeBtn?.addEventListener('click', () => {
       window.App.toggleTheme();
+    });
+
+    // Botão de preenchimento rápido
+    document.getElementById('quick-fill-btn')?.addEventListener('click', () => {
+      const emailInput = document.getElementById('f-email');
+      const passInput = document.getElementById('f-pass');
+      if (emailInput && passInput) {
+        emailInput.value = 'admin@gestao.com';
+        passInput.value = '123456';
+        document.getElementById('login-form')?.dispatchEvent(new Event('submit'));
+      }
     });
 
     // Form submit
@@ -288,6 +301,17 @@ const AuthViews = {
     const themeBtn = document.getElementById('auth-theme-toggle');
     themeBtn?.addEventListener('click', () => {
       window.App.toggleTheme();
+    });
+
+    // Botão de preenchimento rápido
+    document.getElementById('quick-fill-btn')?.addEventListener('click', () => {
+      const emailInput = document.getElementById('f-email');
+      const passInput = document.getElementById('f-pass');
+      if (emailInput && passInput) {
+        emailInput.value = 'admin@gestao.com';
+        passInput.value = '123456';
+        document.getElementById('login-form')?.dispatchEvent(new Event('submit'));
+      }
     });
 
     // Form submit

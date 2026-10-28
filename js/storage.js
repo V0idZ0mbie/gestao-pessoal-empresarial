@@ -53,7 +53,24 @@ const Storage = {
       }
     }
 
-    return this._getFromLocalStorage(collection, userId);
+    const localItems = this._getFromLocalStorage(collection, userId);
+    // Se a coleção estiver vazia localmente e for clients/service_orders/services_catalog, carrega o banco migrado automaticamente
+    if (localItems.length === 0) {
+      if (collection === 'clients' && window.MIGRATED_CLIENTS) {
+        this._saveToLocalStorage(collection, userId, window.MIGRATED_CLIENTS);
+        return window.MIGRATED_CLIENTS;
+      }
+      if (collection === 'service_orders' && window.MIGRATED_ORDERS) {
+        this._saveToLocalStorage(collection, userId, window.MIGRATED_ORDERS);
+        return window.MIGRATED_ORDERS;
+      }
+      if (collection === 'services_catalog' && window.MIGRATED_SERVICES_CATALOG) {
+        this._saveToLocalStorage(collection, userId, window.MIGRATED_SERVICES_CATALOG);
+        return window.MIGRATED_SERVICES_CATALOG;
+      }
+    }
+
+    return localItems;
   },
 
   // Cria um novo item
