@@ -3,6 +3,26 @@
 // Se não houver conexão ou for modo offline/demo, usa localStorage isolado por usuário.
 
 const Storage = {
+  _isCloudEnabled(userId) {
+    return Boolean(window.supabaseConfigured && window.supabase?.from && !userId.startsWith('local-'));
+  },
+
+  _toDatabaseItem(collection, item) {
+    if (collection === 'service_orders' && Object.prototype.hasOwnProperty.call(item, 'clienteId')) {
+      const { clienteId, ...rest } = item;
+      return { ...rest, cliente_id: clienteId };
+    }
+    return item;
+  },
+
+  _fromDatabaseItem(collection, item) {
+    if (collection === 'service_orders' && Object.prototype.hasOwnProperty.call(item, 'cliente_id')) {
+      const { cliente_id, ...rest } = item;
+      return { ...rest, clienteId: cliente_id };
+    }
+    return item;
+  },
+
   async _getCurrentUserId() {
     if (window.supabase && window.supabase.auth) {
       try {
@@ -41,13 +61,13 @@ const Storage = {
     const userId = await this._getCurrentUserId();
 
     // Se temos cliente supabase ativo com sessão válida
-    if (window.supabase && window.supabase.from && !userId.startsWith('local-')) {
+    if (this._isCloudEnabled(userId)) {
       try {
         const { data, error } = await window.supabase
           .from(collection)
           .select('*')
           .eq('user_id', userId);
-        if (!error && data) return data;
+        if (!error && data) return data.map(item => this._fromDatabaseItem(collection, item));
       } catch (err) {
         console.warn(`[Storage] Supabase get falhou para ${collection}, usando dados locais:`, err.message);
       }
@@ -86,19 +106,20 @@ const Storage = {
       updated_at: now
     };
 
-    if (window.supabase && window.supabase.from && !userId.startsWith('local-')) {
+    if (this._isCloudEnabled(userId)) {
       try {
         const { data, error } = await window.supabase
           .from(collection)
-          .insert(newItem)
+          .insert(this._toDatabaseItem(collection, newItem))
           .select()
           .single();
         if (!error && data) {
+          const normalizedData = this._fromDatabaseItem(collection, data);
           // Atualiza também o cache local
           const localItems = this._getFromLocalStorage(collection, userId);
-          localItems.push(data);
+          localItems.push(normalizedData);
           this._saveToLocalStorage(collection, userId, localItems);
-          return data;
+          return normalizedData;
         }
       } catch (err) {
         console.warn(`[Storage] Supabase add falhou para ${collection}, salvando localmente:`, err.message);
@@ -116,21 +137,22 @@ const Storage = {
     const userId = await this._getCurrentUserId();
     const now = new Date().toISOString();
 
-    if (window.supabase && window.supabase.from && !userId.startsWith('local-')) {
+    if (this._isCloudEnabled(userId)) {
       try {
         const { data, error } = await window.supabase
           .from(collection)
-          .update({ ...patch, updated_at: now })
+          .update(this._toDatabaseItem(collection, { ...patch, updated_at: now }))
           .eq('id', id)
           .eq('user_id', userId)
           .select()
           .single();
         if (!error && data) {
+          const normalizedData = this._fromDatabaseItem(collection, data);
           const items = this._getFromLocalStorage(collection, userId);
           const idx = items.findIndex(i => i.id === id);
-          if (idx !== -1) items[idx] = data;
+          if (idx !== -1) items[idx] = normalizedData;
           this._saveToLocalStorage(collection, userId, items);
-          return data;
+          return normalizedData;
         }
       } catch (err) {
         console.warn(`[Storage] Supabase update falhou para ${collection}:`, err.message);
@@ -151,7 +173,7 @@ const Storage = {
   async remove(collection, id) {
     const userId = await this._getCurrentUserId();
 
-    if (window.supabase && window.supabase.from && !userId.startsWith('local-')) {
+    if (this._isCloudEnabled(userId)) {
       try {
         await window.supabase
           .from(collection)

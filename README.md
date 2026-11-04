@@ -31,34 +31,14 @@ Dashboard 100% estático em HTML/CSS/JavaScript, hospedável em qualquer endpoin
 
 1. Acesse [Supabase](https://supabase.com) e crie um projeto
 2. Copie a **URL de projeto** (ex: `https://abc123.supabase.co`) e a **chave anônima** (`anon` key)
-3. Edite `js/supabase.js` e preencha:
+3. Edite `js/supabase.js` e preencha a chave pública `anon` do projeto:
 
    ```javascript
    window.SUPABASE_URL = "SUA_URL_AQUI";
-   window.SUPABASE_ANON_KEY = "SUA_CHAVE_ANON_KEY";
+   window.SUPABASE_ANON_KEY = "eyJ..."; // Settings > API > Publishable/anon key
    ```
 
-4. (Opcional) Crie as tabelas necessárias no Supabase SQL Editor:
-
-   ```sql
-   -- Exemplo: tabela accounts
-   create table accounts (
-     id          uuid primary key default gen_random_uuid(),
-     user_id     uuid not null,
-     banco       text not null,
-     titular     text not null,
-     tipo        text,
-     saldo       numeric,
-     created_at  timestamptz default now(),
-     updated_at  timestamptz
-   );
-
-   -- Regras de segurança (Row Level Security)
-   alter table accounts enable row level security;
-   create policy "Usuários só veem o seus próprios dados"
-     on accounts for select
-     using (auth.uid() = user_id);
-   ```
+4. Execute o arquivo [`supabase-migration.sql`](./supabase-migration.sql) no SQL Editor. Ele cria todas as tabelas, índices de segurança (RLS) e triggers usados pelo aplicativo.
 
 5. Faça o upload do repositório e configure o GitHub Pages.
 

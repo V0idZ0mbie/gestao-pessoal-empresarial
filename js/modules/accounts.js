@@ -1,16 +1,73 @@
-// ============ Contas Bancárias ============
+// ============ Contas Bancárias ===========
 // CRUD de contas: banco, titular, tipo, saldo.
 
 const AccountsModule = (() => {
   const COLLECTION = 'accounts';
+  
+  // Estado de ordenação global
+  let sortState = {
+    column: null,
+    direction: 'asc'
+  };
+
+  function getSortIcon() {
+    const icons = {
+      asc: 'fa-sort-asc',
+      desc: 'fa-sort-desc',
+      none: 'fa-sort'
+    };
+    return icons[sortState.direction] || 'fa-sort';
+  }
+
+  function getSortableHeader(column, label) {
+    const isActive = sortState.column === column;
+    const iconClass = isActive ? getSortIcon() : 'fa-sort';
+    
+    return `
+      <th class="sortable-header" data-column="${column}" onclick="AccountsModule.sortBy('${column}')">
+        ${label}
+        <i class="fas ${iconClass}" style="margin-left:6px;font-size:0.8em;"></i>
+      </th>
+    `;
+  }
+
+  function sortItems(items, column) {
+    if (!column) return items;
+    
+    const newDirection = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
+    sortState.column = column;
+    sortState.direction = newDirection;
+    
+    return [...items].sort((a, b) => {
+      let valA = a[column];
+      let valB = b[column];
+      
+      if (column === 'saldo') {
+        valA = parseFloat(valA) || 0;
+        valB = parseFloat(valB) || 0;
+      } else {
+        valA = valA ? valA.toString().toLowerCase() : '';
+        valB = valB ? valB.toString().toLowerCase() : '';
+      }
+      
+      if (valA < valB) return sortState.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortState.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
 
   async function renderList(container) {
     const items = await Storage.get(COLLECTION);
+    const totalSaldo = items.reduce((acc, curr) => acc + (parseFloat(curr.saldo) || 0), 0);
+
+    // Aplica ordenação atual
+    const sortedItems = sortItems(items, sortState.column);
+
     container.innerHTML = `
       <div class="header">
         <div>
           <h1>Contas Bancárias</h1>
-          <p class="subtitle">Gerencie suas contas corrente, poupança, carteiras digitais e cartões</p>
+          <p class="subtitle">Total: <strong>${formatBRL(totalSaldo)}</strong> | ${items.length} contas</p>
         </div>
         <button class="btn btn-primary" onclick="AccountsModule.openForm()">
           <i class="fas fa-plus"></i> Nova Conta
@@ -21,15 +78,15 @@ const AccountsModule = (() => {
         <table>
           <thead>
             <tr>
-              <th>Instituição / Banco</th>
-              <th>Titular</th>
-              <th>Modalidade</th>
-              <th>Saldo Disponível</th>
+              ${getSortableHeader('banco', 'Instituição / Banco')}
+              ${getSortableHeader('titular', 'Titular')}
+              ${getSortableHeader('tipo', 'Modalidade')}
+              ${getSortableHeader('saldo', 'Saldo Disponível')}
               <th style="text-align:right;">Ações</th>
             </tr>
           </thead>
           <tbody>
-            ${items.map(a => `
+            ${sortedItems.map(a => `
               <tr>
                 <td style="font-weight:700;">
                   <i class="fas fa-university" style="color:var(--primary);margin-right:8px;"></i>
@@ -136,7 +193,12 @@ const AccountsModule = (() => {
     document.getElementById('modal-overlay').classList.remove('open');
   }
 
-  return { render: renderList, renderList, openForm, deleteItem, closeModal };
+  async function sortBy(column) {
+    sortItems([], column); // Atualiza o estado global
+    await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
+  }
+
+  return { render: renderList, renderList, openForm, deleteItem, closeModal, sortBy };
 })();
 
 window.AccountsModule = AccountsModule;

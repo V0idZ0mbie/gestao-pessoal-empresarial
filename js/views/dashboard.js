@@ -158,7 +158,7 @@ const DashboardView = {
   },
 
   async onImportSeed() {
-    if (!confirm('Deseja carregar a base de dados migrada (71 clientes, 321 serviços e tabela de valores médios)?')) return;
+    if (!confirm('Deseja carregar a base de dados migrada (71 clientes, 322 serviços e tabela de valores médios)?')) return;
     try {
       if (window.SeedData && typeof window.SeedData.importAll === 'function') {
         await window.SeedData.importAll();

@@ -3996,6 +3996,16 @@ window.MIGRATED_ORDERS = [
     "status": "concluida",
     "data_abertura": "2026-10-15",
     "obs": "Local/Ref: Ed. Jacarandá"
+  },
+  {
+    "id": "os-322",
+    "clienteId": "cli-25",
+    "clienteNome": "Paulo",
+    "descricao": "[Instalações & Manutenção Elétrica] Reinstalação de cabo de rede para câmera de segurança",
+    "valor": 189.9,
+    "status": "aberta",
+    "data_abertura": "2026-10-28",
+    "obs": "Material: R$ 39,90 (cabo de rede). Mão de obra orçada: R$ 150,00"
   }
 ];
 

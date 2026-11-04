@@ -1,19 +1,77 @@
-// ============ Investimentos ============
+// ============ Investimentos ===========
 // CRUD de investimentos: nome, tipo, valor, data, lucro/rendimento, observações.
 
 const InvestmentsModule = (() => {
   const COLLECTION = 'investments';
+  
+  // Estado de ordenação global
+  let sortState = {
+    column: null,
+    direction: 'asc'
+  };
+
+  function getSortIcon() {
+    const icons = {
+      asc: 'fa-sort-asc',
+      desc: 'fa-sort-desc',
+      none: 'fa-sort'
+    };
+    return icons[sortState.direction] || 'fa-sort';
+  }
+
+  function getSortableHeader(column, label) {
+    const isActive = sortState.column === column;
+    const iconClass = isActive ? getSortIcon() : 'fa-sort';
+    
+    return `
+      <th class="sortable-header" data-column="${column}" onclick="InvestmentsModule.sortBy('${column}')">
+        ${label}
+        <i class="fas ${iconClass}" style="margin-left:6px;font-size:0.8em;"></i>
+      </th>
+    `;
+  }
+
+  function sortItems(items, column) {
+    if (!column) return items;
+    
+    const newDirection = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
+    sortState.column = column;
+    sortState.direction = newDirection;
+    
+    return [...items].sort((a, b) => {
+      let valA = a[column];
+      let valB = b[column];
+      
+      if (column === 'valor' || column === 'lucro') {
+        valA = parseFloat(valA) || 0;
+        valB = parseFloat(valB) || 0;
+      } else if (column === 'data') {
+        valA = valA ? new Date(valA + 'T00:00:00').getTime() : 0;
+        valB = valB ? new Date(valB + 'T00:00:00').getTime() : 0;
+      } else {
+        valA = valA ? valA.toString().toLowerCase() : '';
+        valB = valB ? valB.toString().toLowerCase() : '';
+      }
+      
+      if (valA < valB) return sortState.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortState.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
 
   async function renderList(container) {
     const items = await Storage.get(COLLECTION);
     const totalAporte = items.reduce((acc, curr) => acc + (parseFloat(curr.valor) || 0), 0);
     const totalLucro = items.reduce((acc, curr) => acc + (parseFloat(curr.lucro) || 0), 0);
 
+    // Aplica ordenação atual
+    const sortedItems = sortItems(items, sortState.column);
+
     container.innerHTML = `
       <div class="header">
         <div>
           <h1>Carteira de Investimentos</h1>
-          <p class="subtitle">Patrimônio aportado: <strong>${formatBRL(totalAporte)}</strong> | Rendimentos acumulados: <strong style="color:var(--success);">${formatBRL(totalLucro)}</strong></p>
+          <p class="subtitle">Patrimônio aportado: <strong>${formatBRL(totalAporte)}</strong> | Rendimentos: <strong style="color:var(--success);">${formatBRL(totalLucro)}</strong></p>
         </div>
         <button class="btn btn-primary" onclick="InvestmentsModule.openForm()">
           <i class="fas fa-plus"></i> Novo Ativo
@@ -24,17 +82,17 @@ const InvestmentsModule = (() => {
         <table>
           <thead>
             <tr>
-              <th>Data do Aporte</th>
-              <th>Ativo / Aplicação</th>
-              <th>Classe de Ativo</th>
-              <th>Valor Investido</th>
-              <th>Lucro / Proventos</th>
-              <th>Notas</th>
+              ${getSortableHeader('data', 'Data do Aporte')}
+              ${getSortableHeader('nome', 'Ativo / Aplicação')}
+              ${getSortableHeader('tipo', 'Classe de Ativo')}
+              ${getSortableHeader('valor', 'Valor Investido')}
+              ${getSortableHeader('lucro', 'Lucro / Proventos')}
+              ${getSortableHeader('obs', 'Notas')}
               <th style="text-align:right;">Ações</th>
             </tr>
           </thead>
           <tbody>
-            ${items.map(inv => `
+            ${sortedItems.map(inv => `
               <tr>
                 <td>${inv.data ? new Date(inv.data + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
                 <td style="font-weight:700;">
@@ -59,6 +117,15 @@ const InvestmentsModule = (() => {
         </table>
       </div>
     `;
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+
+  async function sortBy(column) {
+    sortItems([], column);
+    await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
   }
 
   async function openForm(id) {
@@ -158,7 +225,7 @@ const InvestmentsModule = (() => {
     document.getElementById('modal-overlay').classList.remove('open');
   }
 
-  return { render: renderList, renderList, openForm, deleteItem, closeModal };
+  return { render: renderList, renderList, openForm, deleteItem, closeModal, sortBy };
 })();
 
 window.InvestmentsModule = InvestmentsModule;

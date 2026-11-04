@@ -9,7 +9,7 @@ window.registerUser = async function (username, email, password) {
   }
 
   // Tenta cadastro via Supabase se disponível
-  if (window.supabase?.auth && !window.SUPABASE_ANON_KEY.includes('dummyKey')) {
+  if (window.supabaseConfigured && window.supabase?.auth) {
     try {
       const { data, error } = await window.supabase.auth.signUp({
         email: normalizedEmail,
@@ -59,7 +59,7 @@ window.loginUser = async function (email, password) {
   const normalizedEmail = email.trim().toLowerCase();
 
   // Se supabase ativo
-  if (window.supabase?.auth && !window.SUPABASE_ANON_KEY.includes('dummyKey')) {
+  if (window.supabaseConfigured && window.supabase?.auth) {
     try {
       const { data, error } = await window.supabase.auth.signInWithPassword({
         email: normalizedEmail,

@@ -1,18 +1,76 @@
-// ============ Gastos / Despesas ============
+// ============ Gastos / Despesas ===========
 // CRUD de gastos: descrição, valor, data, categoria, conta vinculada.
 
 const ExpensesModule = (() => {
   const COLLECTION = 'expenses';
+  
+  // Estado de ordenação global
+  let sortState = {
+    column: null,
+    direction: 'asc'
+  };
+
+  function getSortIcon() {
+    const icons = {
+      asc: 'fa-sort-asc',
+      desc: 'fa-sort-desc',
+      none: 'fa-sort'
+    };
+    return icons[sortState.direction] || 'fa-sort';
+  }
+
+  function getSortableHeader(column, label) {
+    const isActive = sortState.column === column;
+    const iconClass = isActive ? getSortIcon() : 'fa-sort';
+    
+    return `
+      <th class="sortable-header" data-column="${column}" onclick="ExpensesModule.sortBy('${column}')">
+        ${label}
+        <i class="fas ${iconClass}" style="margin-left:6px;font-size:0.8em;"></i>
+      </th>
+    `;
+  }
+
+  function sortItems(items, column) {
+    if (!column) return items;
+    
+    const newDirection = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
+    sortState.column = column;
+    sortState.direction = newDirection;
+    
+    return [...items].sort((a, b) => {
+      let valA = a[column];
+      let valB = b[column];
+      
+      if (column === 'valor') {
+        valA = parseFloat(valA) || 0;
+        valB = parseFloat(valB) || 0;
+      } else if (column === 'data') {
+        valA = valA ? new Date(valA + 'T00:00:00').getTime() : 0;
+        valB = valB ? new Date(valB + 'T00:00:00').getTime() : 0;
+      } else {
+        valA = valA ? valA.toString().toLowerCase() : '';
+        valB = valB ? valB.toString().toLowerCase() : '';
+      }
+      
+      if (valA < valB) return sortState.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortState.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
 
   async function renderList(container) {
     const items = await Storage.get(COLLECTION);
     const totalGasto = items.reduce((acc, curr) => acc + (parseFloat(curr.valor) || 0), 0);
 
+    // Aplica ordenação atual
+    const sortedItems = sortItems(items, sortState.column);
+
     container.innerHTML = `
       <div class="header">
         <div>
           <h1>Controle de Gastos & Despesas</h1>
-          <p class="subtitle">Total acumulado em despesas: <strong>${formatBRL(totalGasto)}</strong></p>
+          <p class="subtitle">Total: <strong>${formatBRL(totalGasto)}</strong> | ${items.length} lançamentos</p>
         </div>
         <button class="btn btn-primary" onclick="ExpensesModule.openForm()">
           <i class="fas fa-plus"></i> Novo Lançamento
@@ -23,15 +81,15 @@ const ExpensesModule = (() => {
         <table>
           <thead>
             <tr>
-              <th>Data</th>
-              <th>Descrição do Gasto</th>
-              <th>Categoria</th>
-              <th>Valor (R$)</th>
+              ${getSortableHeader('data', 'Data')}
+              ${getSortableHeader('descricao', 'Descrição')}
+              ${getSortableHeader('categoria', 'Categoria')}
+              ${getSortableHeader('valor', 'Valor (R$)')}
               <th style="text-align:right;">Ações</th>
             </tr>
           </thead>
           <tbody>
-            ${items.map(e => `
+            ${sortedItems.map(e => `
               <tr>
                 <td>${e.data ? new Date(e.data + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
                 <td style="font-weight:700;">
@@ -56,6 +114,15 @@ const ExpensesModule = (() => {
     `;
   }
 
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+
+  async function sortBy(column) {
+    sortItems([], column);
+    await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
+  }
+
   async function openForm(id) {
     const items = await Storage.get(COLLECTION);
     const item = id ? items.find(e => e.id === id) : null;
@@ -65,40 +132,40 @@ const ExpensesModule = (() => {
     const defaultDate = item?.data || new Date().toISOString().slice(0, 10);
 
     document.getElementById('modal-title').textContent = item ? 'Editar Despesa' : 'Novo Lançamento de Gasto';
-    document.getElementById('modal-body').innerHTML = `
-      <div class="form-group">
-        <label>Descrição do Gasto *</label>
-        <input id="f-descricao" type="text" placeholder="Ex: Assinatura de Software, Aluguel, Combustível" value="${escapeHtml(item?.descricao || '')}" />
-      </div>
-      <div class="form-group">
-        <label>Valor da Despesa (R$) *</label>
-        <input id="f-valor" type="number" step="0.01" min="0" placeholder="0,00" value="${item ? item.valor : ''}" />
-      </div>
-      <div class="form-group">
-        <label>Data de Pagamento / Vencimento</label>
-        <input id="f-data" type="date" value="${defaultDate}" />
-      </div>
-      <div class="form-group">
-        <label>Categoria Financeira</label>
-        <select id="f-categoria">
-          <option value="Alimentação" ${item?.categoria === 'Alimentação' ? 'selected' : ''}>Alimentação</option>
-          <option value="Transporte" ${item?.categoria === 'Transporte' ? 'selected' : ''}>Transporte</option>
-          <option value="Moradia / Escritório" ${item?.categoria === 'Moradia / Escritório' ? 'selected' : ''}>Moradia / Escritório</option>
-          <option value="Saúde & Bem-estar" ${item?.categoria === 'Saúde & Bem-estar' ? 'selected' : ''}>Saúde & Bem-estar</option>
-          <option value="Lazer & Viagens" ${item?.categoria === 'Lazer & Viagens' ? 'selected' : ''}>Lazer & Viagens</option>
-          <option value="Educação & Treinamentos" ${item?.categoria === 'Educação & Treinamentos' ? 'selected' : ''}>Educação & Treinamentos</option>
-          <option value="Impostos & Taxas" ${item?.categoria === 'Impostos & Taxas' ? 'selected' : ''}>Impostos & Taxas</option>
-          <option value="Outros" ${item?.categoria === 'Outros' ? 'selected' : ''}>Outros</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Conta de Saída (opcional)</label>
-        <select id="f-conta">
-          <option value="">Nenhuma / Dinheiro físico</option>
-          ${accounts.map(a => `<option value="${a.id}" ${item?.conta_id === a.id ? 'selected' : ''}>${escapeHtml(a.banco)} — Saldo: ${formatBRL(a.saldo)}</option>`).join('')}
-        </select>
-      </div>
-    `;
+        document.getElementById('modal-body').innerHTML = `
+          <div class="form-group">
+            <label>Descrição do Gasto *</label>
+            <input id="f-descricao" type="text" placeholder="Ex: Assinatura de Software, Aluguel" value="${escapeHtml(item?.descricao || '')}" />
+          </div>
+          <div class="form-group">
+            <label>Valor da Despesa (R$) *</label>
+            <input id="f-valor" type="number" step="0.01" min="0" placeholder="0,00" value="${item ? item.valor : ''}" />
+          </div>
+          <div class="form-group">
+            <label>Data de Pagamento / Vencimento</label>
+            <input id="f-data" type="date" value="${defaultDate}" />
+          </div>
+          <div class="form-group">
+            <label>Categoria Financeira</label>
+            <select id="f-categoria">
+              <option value="Alimentação" ${item?.categoria === 'Alimentação' ? 'selected' : ''}>Alimentação</option>
+              <option value="Transporte" ${item?.categoria === 'Transporte' ? 'selected' : ''}>Transporte</option>
+              <option value="Moradia / Escritório" ${item?.categoria === 'Moradia / Escritório' ? 'selected' : ''}>Moradia / Escritório</option>
+              <option value="Saúde & Bem-estar" ${item?.categoria === 'Saúde & Bem-estar' ? 'selected' : ''}>Saúde & Bem-estar</option>
+              <option value="Lazer & Viagens" ${item?.categoria === 'Lazer & Viagens' ? 'selected' : ''}>Lazer & Viagens</option>
+              <option value="Educação & Treinamentos" ${item?.categoria === 'Educação & Treinamentos' ? 'selected' : ''}>Educação & Treinamentos</option>
+              <option value="Impostos & Taxas" ${item?.categoria === 'Impostos & Taxas' ? 'selected' : ''}>Impostos & Taxas</option>
+              <option value="Outros" ${item?.categoria === 'Outros' ? 'selected' : ''}>Outros</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Conta de Saída (opcional)</label>
+            <select id="f-conta">
+              <option value="">Nenhuma / Dinheiro físico</option>
+              ${accounts.map(a => `<option value="${a.id}" ${item?.conta_id === a.id ? 'selected' : ''}>${escapeHtml(a.banco)} - Saldo: ${formatBRL(a.saldo)}</option>`).join('')}
+            </select>
+          </div>
+        `;
 
     document.getElementById('modal-submit').textContent = item ? 'Salvar Alterações' : 'Registrar Gasto';
 
@@ -148,11 +215,7 @@ const ExpensesModule = (() => {
     }
   }
 
-  function closeModal() {
-    document.getElementById('modal-overlay').classList.remove('open');
-  }
-
-  return { render: renderList, renderList, openForm, deleteItem, closeModal };
+  return { render: renderList, renderList, openForm, deleteItem, closeModal, sortBy };
 })();
 
 window.ExpensesModule = ExpensesModule;

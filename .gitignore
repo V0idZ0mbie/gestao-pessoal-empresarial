@@ -15,5 +15,4 @@ Thumbs.db
 .vscode/
 *.log
 
-# Supabase configuration (NÃO cometer com chaves reais)
-js/supabase.js
+# A chave anon do Supabase é pública e é necessária no GitHub Pages.
