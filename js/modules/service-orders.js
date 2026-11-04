@@ -34,10 +34,6 @@ const ServiceOrdersModule = (() => {
   function sortItems(items, column) {
     if (!column) return items;
     
-    const newDirection = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
-    sortState.column = column;
-    sortState.direction = newDirection;
-    
     return [...items].sort((a, b) => {
       let valA = a[column] || (column === 'cliente' ? '' : column === 'status' ? '' : 0);
       let valB = b[column] || (column === 'cliente' ? '' : column === 'status' ? '' : 0);
@@ -233,7 +229,8 @@ const ServiceOrdersModule = (() => {
   }
 
   async function sortBy(column) {
-    sortItems([], column); // Atualiza o estado global
+    sortState.direction = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
+    sortState.column = column;
     await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
   }
 

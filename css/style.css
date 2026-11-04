@@ -551,6 +551,17 @@ th {
   white-space: nowrap;
 }
 
+th.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+th.sortable-header:hover {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
 tbody tr {
   transition: background-color 0.15s ease;
 }

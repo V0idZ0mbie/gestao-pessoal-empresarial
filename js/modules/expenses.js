@@ -34,10 +34,6 @@ const ExpensesModule = (() => {
   function sortItems(items, column) {
     if (!column) return items;
     
-    const newDirection = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
-    sortState.column = column;
-    sortState.direction = newDirection;
-    
     return [...items].sort((a, b) => {
       let valA = a[column];
       let valB = b[column];
@@ -119,7 +115,8 @@ const ExpensesModule = (() => {
   }
 
   async function sortBy(column) {
-    sortItems([], column);
+    sortState.direction = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
+    sortState.column = column;
     await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
   }
 

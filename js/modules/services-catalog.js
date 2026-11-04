@@ -4,6 +4,31 @@
 
 const ServicesCatalogModule = (() => {
   const COLLECTION = 'services_catalog';
+  let sortState = { column: null, direction: 'asc' };
+
+  function getSortableHeader(column, label) {
+    const active = sortState.column === column;
+    const icon = active ? (sortState.direction === 'asc' ? 'fa-sort-asc' : 'fa-sort-desc') : 'fa-sort';
+    return `<th class="sortable-header" onclick="ServicesCatalogModule.sortBy('${column}')">${label}<i class="fas ${icon}" style="margin-left:6px;font-size:0.8em;"></i></th>`;
+  }
+
+  function sortItems(items) {
+    if (!sortState.column) return items;
+    const numeric = ['media', 'minimo', 'maximo', 'total_atendimentos', 'faturamento_acumulado'];
+    return [...items].sort((a, b) => {
+      let aValue = a[sortState.column];
+      let bValue = b[sortState.column];
+      if (numeric.includes(sortState.column)) {
+        aValue = Number(aValue) || 0;
+        bValue = Number(bValue) || 0;
+      } else {
+        aValue = (Array.isArray(aValue) ? aValue.join(' ') : aValue || '').toString().toLocaleLowerCase('pt-BR');
+        bValue = (Array.isArray(bValue) ? bValue.join(' ') : bValue || '').toString().toLocaleLowerCase('pt-BR');
+      }
+      const result = typeof aValue === 'string' ? aValue.localeCompare(bValue, 'pt-BR') : aValue - bValue;
+      return sortState.direction === 'asc' ? result : -result;
+    });
+  }
 
   async function render(container) {
     let items = await Storage.get(COLLECTION);
@@ -12,6 +37,7 @@ const ServicesCatalogModule = (() => {
     if (!items || items.length === 0) {
       items = window.MIGRATED_SERVICES_CATALOG || [];
     }
+    items = sortItems(items);
 
     const totalAtendimentos = items.reduce((acc, curr) => acc + (curr.total_atendimentos || 0), 0);
     const faturamentoHistorico = items.reduce((acc, curr) => acc + (curr.faturamento_acumulado || 0), 0);
@@ -100,12 +126,12 @@ const ServicesCatalogModule = (() => {
         <table id="services-table">
           <thead>
             <tr>
-              <th>Especialidade / Categoria</th>
-              <th>Valor Médio Cobrado</th>
-              <th>Faixa de Preço (Mín - Máx)</th>
-              <th>Demanda (Qtd.)</th>
-              <th>Faturamento Histórico</th>
-              <th>Exemplos de Serviços no Banco</th>
+              ${getSortableHeader('categoria', 'Especialidade / Categoria')}
+              ${getSortableHeader('media', 'Valor Médio Cobrado')}
+              ${getSortableHeader('minimo', 'Faixa de Preço (Mín - Máx)')}
+              ${getSortableHeader('total_atendimentos', 'Demanda (Qtd.)')}
+              ${getSortableHeader('faturamento_acumulado', 'Faturamento Histórico')}
+              ${getSortableHeader('exemplos', 'Exemplos de Serviços no Banco')}
               <th style="text-align:right;">Ações</th>
             </tr>
           </thead>
@@ -159,6 +185,12 @@ const ServicesCatalogModule = (() => {
         row.style.display = '';
       } else {
         row.style.display = 'none';
+      }
+
+      async function sortBy(column) {
+        sortState.direction = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
+        sortState.column = column;
+        await render(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
       }
     });
   }
@@ -216,7 +248,7 @@ const ServicesCatalogModule = (() => {
     overlay.classList.add('open');
   }
 
-  return { render, renderList: render, filterTable, openForm };
+  return { render, renderList: render, filterTable, openForm, sortBy };
 })();
 
 window.ServicesCatalogModule = ServicesCatalogModule;

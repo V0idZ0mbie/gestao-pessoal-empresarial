@@ -2,6 +2,40 @@
 // Exibe métricas rápidas: valor total em contas, gastos do mês,
 // investimentos e ordens de serviço abertas.
 
+const dashboardSortState = {
+  accounts: { column: null, direction: 'asc' },
+  orders: { column: null, direction: 'asc' }
+};
+
+function dashboardSortHeader(type, column, label) {
+  const state = dashboardSortState[type];
+  const active = state.column === column;
+  const icon = active ? (state.direction === 'asc' ? 'fa-sort-asc' : 'fa-sort-desc') : 'fa-sort';
+  return `<th class="sortable-header" onclick="DashboardView.sortBy('${type}', '${column}')">${label}<i class="fas ${icon}" style="margin-left:6px;font-size:0.8em;"></i></th>`;
+}
+
+function sortDashboardItems(items, type, clientMap) {
+  const state = dashboardSortState[type];
+  if (!state.column) return items.slice(-5).reverse();
+  return items.slice().sort((a, b) => {
+    let valueA = a[state.column];
+    let valueB = b[state.column];
+    if (state.column === 'cliente') {
+      valueA = clientMap[a.clienteId] || '';
+      valueB = clientMap[b.clienteId] || '';
+    }
+    if (state.column === 'valor' || state.column === 'saldo') {
+      valueA = Number(valueA) || 0;
+      valueB = Number(valueB) || 0;
+    } else {
+      valueA = (valueA || '').toString().toLocaleLowerCase('pt-BR');
+      valueB = (valueB || '').toString().toLocaleLowerCase('pt-BR');
+    }
+    const result = typeof valueA === 'string' ? valueA.localeCompare(valueB, 'pt-BR') : valueA - valueB;
+    return state.direction === 'asc' ? result : -result;
+  }).slice(0, 5);
+}
+
 const DashboardView = {
   async render(container) {
     const accounts = await Storage.get('accounts');
@@ -23,6 +57,8 @@ const DashboardView = {
     const clients = await Storage.get('clients');
     const clientMap = {};
     clients.forEach(c => { clientMap[c.id] = c.nome; });
+    const dashboardAccounts = sortDashboardItems(accounts, 'accounts', clientMap);
+    const dashboardOrders = sortDashboardItems(sos, 'orders', clientMap);
 
     container.innerHTML = `
       <div class="header">
@@ -98,14 +134,14 @@ const DashboardView = {
             <table>
               <thead>
                 <tr>
-                  <th>Banco</th>
-                  <th>Titular</th>
-                  <th>Tipo</th>
-                  <th>Saldo</th>
+                  ${dashboardSortHeader('accounts', 'banco', 'Banco')}
+                  ${dashboardSortHeader('accounts', 'titular', 'Titular')}
+                  ${dashboardSortHeader('accounts', 'tipo', 'Tipo')}
+                  ${dashboardSortHeader('accounts', 'saldo', 'Saldo')}
                 </tr>
               </thead>
               <tbody>
-                ${accounts.slice(-5).reverse().map(a => `
+                ${dashboardAccounts.map(a => `
                   <tr>
                     <td><strong>${escapeHtml(a.banco)}</strong></td>
                     <td>${escapeHtml(a.titular)}</td>
@@ -127,14 +163,14 @@ const DashboardView = {
             <table>
               <thead>
                 <tr>
-                  <th>Cliente</th>
-                  <th>Descrição</th>
-                  <th>Valor</th>
-                  <th>Status</th>
+                  ${dashboardSortHeader('orders', 'cliente', 'Cliente')}
+                  ${dashboardSortHeader('orders', 'descricao', 'Descrição')}
+                  ${dashboardSortHeader('orders', 'valor', 'Valor')}
+                  ${dashboardSortHeader('orders', 'status', 'Status')}
                 </tr>
               </thead>
               <tbody>
-                ${sos.slice(-5).reverse().map(s => {
+                ${dashboardOrders.map(s => {
                   const clientName = clientMap[s.clienteId] || 'Cliente Avulso';
                   const badgeClass = s.status === 'concluida' ? 'success' : (s.status === 'em_andamento' ? 'warning' : 'info');
                   const labelStatus = s.status === 'concluida' ? 'Concluída' : (s.status === 'em_andamento' ? 'Em Andamento' : 'Aberta');
@@ -155,6 +191,13 @@ const DashboardView = {
         </div>
       </div>
     `;
+  },
+
+  async sortBy(type, column) {
+    const state = dashboardSortState[type];
+    state.direction = state.column === column && state.direction === 'asc' ? 'desc' : 'asc';
+    state.column = column;
+    await this.render(document.getElementById('main-content'));
   },
 
   async onImportSeed() {

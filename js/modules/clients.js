@@ -3,9 +3,30 @@
 
 const ClientsModule = (() => {
   const COLLECTION = 'clients';
+  let sortState = { column: null, direction: 'asc' };
+
+  function getSortableHeader(column, label) {
+    const active = sortState.column === column;
+    const icon = active ? (sortState.direction === 'asc' ? 'fa-sort-asc' : 'fa-sort-desc') : 'fa-sort';
+    return `<th class="sortable-header" onclick="ClientsModule.sortBy('${column}')">${label}<i class="fas ${icon}" style="margin-left:6px;font-size:0.8em;"></i></th>`;
+  }
+
+  function sortItems(items) {
+    if (!sortState.column) return items;
+    return [...items].sort((a, b) => {
+      const value = item => {
+        if (sortState.column === 'contato') return `${item.email || ''} ${item.telefone || ''}`;
+        return item[sortState.column] || '';
+      };
+      const aValue = value(a).toString().toLocaleLowerCase('pt-BR');
+      const bValue = value(b).toString().toLocaleLowerCase('pt-BR');
+      const result = aValue.localeCompare(bValue, 'pt-BR');
+      return sortState.direction === 'asc' ? result : -result;
+    });
+  }
 
   async function renderList(container) {
-    const items = await Storage.get(COLLECTION);
+    const items = sortItems(await Storage.get(COLLECTION));
     container.innerHTML = `
       <div class="header">
         <div>
@@ -21,10 +42,10 @@ const ClientsModule = (() => {
         <table>
           <thead>
             <tr>
-              <th>Nome Completo</th>
-              <th>Empresa / Razão Social</th>
-              <th>Canais de Contato</th>
-              <th>Localização</th>
+              ${getSortableHeader('nome', 'Nome Completo')}
+              ${getSortableHeader('empresa', 'Empresa / Razão Social')}
+              ${getSortableHeader('contato', 'Canais de Contato')}
+              ${getSortableHeader('endereco', 'Localização')}
               <th style="text-align:right;">Ações</th>
             </tr>
           </thead>
@@ -58,6 +79,12 @@ const ClientsModule = (() => {
         </table>
       </div>
     `;
+  }
+
+  async function sortBy(column) {
+    sortState.direction = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
+    sortState.column = column;
+    await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
   }
 
   async function openForm(id) {
@@ -142,7 +169,7 @@ const ClientsModule = (() => {
     document.getElementById('modal-overlay').classList.remove('open');
   }
 
-  return { render: renderList, renderList, openForm, deleteItem, closeModal };
+  return { render: renderList, renderList, openForm, deleteItem, closeModal, sortBy };
 })();
 
 window.ClientsModule = ClientsModule;
