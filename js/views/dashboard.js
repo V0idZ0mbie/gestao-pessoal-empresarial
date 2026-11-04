@@ -70,9 +70,6 @@ const DashboardView = {
           <a href="#/services" class="btn btn-ghost">
             <i class="fas fa-calculator"></i> Ver Tabela de Médias
           </a>
-          <button class="btn btn-primary" onclick="DashboardView.onImportSeed()">
-            <i class="fas fa-database"></i> Sincronizar Banco Migrado
-          </button>
         </div>
       </div>
 
@@ -200,20 +197,6 @@ const DashboardView = {
     await this.render(document.getElementById('main-content'));
   },
 
-  async onImportSeed() {
-    if (!confirm('Deseja carregar a base de dados migrada (71 clientes, 322 serviços e tabela de valores médios)?')) return;
-    try {
-      if (window.SeedData && typeof window.SeedData.importAll === 'function') {
-        await window.SeedData.importAll();
-        Toast.show('Banco de dados migrado com sucesso para o sistema!', 'success');
-        window.dispatchEvent(new HashChangeEvent('hashchange'));
-      } else {
-        Toast.show('Módulo de migração não encontrado.', 'error');
-      }
-    } catch (err) {
-      Toast.show('Erro ao migrar dados: ' + err.message, 'error');
-    }
-  }
 };
 
 window.DashboardView = DashboardView;

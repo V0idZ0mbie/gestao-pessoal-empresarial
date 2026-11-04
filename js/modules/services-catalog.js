@@ -33,10 +33,7 @@ const ServicesCatalogModule = (() => {
   async function render(container) {
     let items = await Storage.get(COLLECTION);
     
-    // Se ainda não foi importado no storage, usa a constante migrada global
-    if (!items || items.length === 0) {
-      items = window.MIGRATED_SERVICES_CATALOG || [];
-    }
+    if (!items) items = [];
     items = sortItems(items);
 
     const totalAtendimentos = items.reduce((acc, curr) => acc + (curr.total_atendimentos || 0), 0);
@@ -186,13 +183,13 @@ const ServicesCatalogModule = (() => {
       } else {
         row.style.display = 'none';
       }
-
-      async function sortBy(column) {
-        sortState.direction = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
-        sortState.column = column;
-        await render(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
-      }
     });
+  }
+
+  async function sortBy(column) {
+    sortState.direction = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
+    sortState.column = column;
+    await render(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
   }
 
   async function openForm(id, cat = '', val = 0) {
