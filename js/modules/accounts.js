@@ -35,10 +35,10 @@ const AccountsModule = (() => {
     if (!column) return items;
     
     return [...items].sort((a, b) => {
-      let valA = a[column];
-      let valB = b[column];
+      let valA = column === 'saldo_atual' ? balances[a.id] : a[column];
+      let valB = column === 'saldo_atual' ? balances[b.id] : b[column];
       
-      if (column === 'saldo') {
+      if (column === 'saldo' || column === 'saldo_atual') {
         valA = parseFloat(valA) || 0;
         valB = parseFloat(valB) || 0;
       } else {
@@ -54,7 +54,13 @@ const AccountsModule = (() => {
 
   async function renderList(container) {
     const items = await Storage.get(COLLECTION);
-    const totalSaldo = items.reduce((acc, curr) => acc + (parseFloat(curr.saldo) || 0), 0);
+    const [gains, expenses] = await Promise.all([Storage.get('gains'), Storage.get('expenses')]);
+    const balances = Object.fromEntries(items.map(account => {
+      const incoming = gains.filter(item => item.conta_id === account.id).reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
+      const outgoing = expenses.filter(item => item.conta_id === account.id).reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
+      return [account.id, (Number(account.saldo) || 0) + incoming - outgoing];
+    }));
+    const totalSaldo = Object.values(balances).reduce((acc, value) => acc + value, 0);
 
     // Aplica ordenação atual
     const sortedItems = sortItems(items, sortState.column);
@@ -63,7 +69,7 @@ const AccountsModule = (() => {
       <div class="header">
         <div>
           <h1>Contas Bancárias</h1>
-          <p class="subtitle">Total: <strong>${formatBRL(totalSaldo)}</strong> | ${items.length} contas</p>
+          <p class="subtitle">Saldo consolidado: <strong>${formatBRL(totalSaldo)}</strong> | ${items.length} contas</p>
         </div>
         <button class="btn btn-primary" onclick="AccountsModule.openForm()">
           <i class="fas fa-plus"></i> Nova Conta
@@ -77,7 +83,7 @@ const AccountsModule = (() => {
               ${getSortableHeader('banco', 'Instituição / Banco')}
               ${getSortableHeader('titular', 'Titular')}
               ${getSortableHeader('tipo', 'Modalidade')}
-              ${getSortableHeader('saldo', 'Saldo Disponível')}
+              ${getSortableHeader('saldo_atual', 'Saldo Atual')}
               <th style="text-align:right;">Ações</th>
             </tr>
           </thead>
@@ -91,7 +97,7 @@ const AccountsModule = (() => {
                 <td>${escapeHtml(a.titular)}</td>
                 <td><span class="badge badge-default">${escapeHtml(a.tipo || 'Corrente')}</span></td>
                 <td style="font-weight:700;color:${(parseFloat(a.saldo) || 0) >= 0 ? 'var(--success)' : 'var(--danger)'};">
-                  ${formatBRL(a.saldo)}
+                  ${formatBRL(balances[a.id])}
                 </td>
                 <td style="white-space:nowrap;text-align:right;">
                   <button class="btn btn-sm btn-ghost" onclick="AccountsModule.openForm('${a.id}')" title="Editar">
@@ -134,7 +140,7 @@ const AccountsModule = (() => {
         </select>
       </div>
       <div class="form-group">
-        <label>Saldo Atual (R$) *</label>
+        <label>Saldo Inicial (R$) *</label>
         <input id="f-saldo" type="number" step="0.01" placeholder="0,00" value="${item ? item.saldo : ''}" />
       </div>
     `;

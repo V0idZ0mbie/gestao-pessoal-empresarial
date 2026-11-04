@@ -7,6 +7,7 @@ Dashboard 100% estático em HTML/CSS/JavaScript, hospedável em qualquer endpoin
 - 🏦 **Contas bancárias** — Listar, adicionar, editar e excluir contas (banco, tipo, saldo)
 - 👥 **Clientes** — Cadastro de clientes com contato e endereço
 - 💰 **Gastos** — Registrar gastos com valor, data, categoria e descrição
+- 💵 **Ganhos** — Registrar receitas vinculadas a contas e ordens de serviço
 - 📈 **Investimentos** — Registrar investimentos (tipo, valor, data, lucro/reelei)
 - 🔧 **Ordens de serviço** — Gerar e acompanhar OLS com status (aberta, em andamento, concluída)
 - 📋 **Cadastros** — Geral de cadastros
@@ -71,6 +72,7 @@ Dashboard 100% estático em HTML/CSS/JavaScript, hospedável em qualquer endpoin
 │   │   └── dashboard.js        # Visão-resumo da Dashboard
 │   └── modules/
 │       ├── accounts.js
+│       ├── gains.js
 │       ├── clients.js
 │       ├── expenses.js
 │       ├── investments.js

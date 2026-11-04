@@ -6,6 +6,7 @@ const ROUTES = {
   accounts: { view: AccountsModule, title: 'Contas Bancárias', icon: 'fa-university', needsAuth: true },
   clients: { view: ClientsModule, title: 'Cadastro de Clientes', icon: 'fa-users', needsAuth: true },
   expenses: { view: ExpensesModule, title: 'Controle de Gastos', icon: 'fa-receipt', needsAuth: true },
+  gains: { view: GainsModule, title: 'Controle de Ganhos', icon: 'fa-arrow-trend-up', needsAuth: true },
   investments: { view: InvestmentsModule, title: 'Gestão de Investimentos', icon: 'fa-piggy-bank', needsAuth: true },
   'service-orders': { view: ServiceOrdersModule, title: 'Ordens de Serviço', icon: 'fa-clipboard-check', needsAuth: true },
   services: { view: ServicesCatalogModule, title: 'Tabela de Serviços & Valores Médios', icon: 'fa-calculator', needsAuth: true },

@@ -111,6 +111,12 @@ const ServiceOrdersModule = (() => {
                   <td>${so.data_abertura ? new Date(so.data_abertura + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
                   <td><span class="badge badge-${badgeClass}">${statusName}</span></td>
                   <td style="white-space:nowrap;text-align:right;">
+                    <button class="btn btn-sm btn-ghost" onclick="GainsModule.openForm(null, '${so.id}')" title="Registrar ganho desta OS">
+                      <i class="fas fa-arrow-up"></i>
+                    </button>
+                    <button class="btn btn-sm btn-ghost" onclick="ExpensesModule.openForm(null, '${so.id}')" title="Registrar gasto desta OS">
+                      <i class="fas fa-arrow-down"></i>
+                    </button>
                     <button class="btn btn-sm btn-ghost" onclick="ServiceOrdersModule.openForm('${so.id}')" title="Editar">
                       <i class="fas fa-pencil-alt"></i>
                     </button>

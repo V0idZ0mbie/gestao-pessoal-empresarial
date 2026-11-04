@@ -35,9 +35,25 @@ create table if not exists expenses (
   data date,
   categoria text,
   conta_id text,
+  ordem_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table if not exists gains (
+  id text primary key default gen_random_uuid()::text,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  descricao text not null,
+  valor numeric not null default 0,
+  data date,
+  categoria text,
+  conta_id text,
+  ordem_id text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table expenses add column if not exists ordem_id text;
 
 create table if not exists investments (
   id text primary key default gen_random_uuid()::text,
@@ -83,6 +99,7 @@ create table if not exists services_catalog (
 alter table accounts enable row level security;
 alter table clients enable row level security;
 alter table expenses enable row level security;
+alter table gains enable row level security;
 alter table investments enable row level security;
 alter table service_orders enable row level security;
 alter table services_catalog enable row level security;
@@ -97,6 +114,10 @@ create policy "Users can manage their own clients" on clients
 
 drop policy if exists "Users can manage their own expenses" on expenses;
 create policy "Users can manage their own expenses" on expenses
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their own gains" on gains;
+create policy "Users can manage their own gains" on gains
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 drop policy if exists "Users can manage their own investments" on investments;
@@ -131,6 +152,10 @@ for each row execute function update_updated_at();
 
 drop trigger if exists update_expenses_updated_at on expenses;
 create trigger update_expenses_updated_at before update on expenses
+for each row execute function update_updated_at();
+
+drop trigger if exists update_gains_updated_at on gains;
+create trigger update_gains_updated_at before update on gains
 for each row execute function update_updated_at();
 
 drop trigger if exists update_investments_updated_at on investments;

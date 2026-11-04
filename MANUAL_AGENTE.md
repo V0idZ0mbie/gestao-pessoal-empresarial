@@ -33,6 +33,7 @@ Este manual fornece instruções diretas, claras e estruturadas para que qualque
 │   │   └── dashboard.js         # Painel geral com métricas (#/dashboard)
 │   └── modules/
 │       ├── accounts.js          # Módulo de Contas Bancárias (#/accounts)
+│       ├── gains.js             # Módulo de Ganhos/Receitas (#/gains)
 │       ├── clients.js           # Módulo de Clientes (#/clients)
 │       ├── expenses.js          # Módulo de Despesas/Gastos (#/expenses)
 │       ├── investments.js       # Módulo de Investimentos (#/investments)
@@ -104,6 +105,22 @@ const cliente = await Storage.find('clients', c => c.id === 'cli-123');
   conta_id: "acc-1"                       // Opcional: ID da conta bancária de saída
 }
 ```
+
+### 💵 Ganhos (`gains`)
+```javascript
+{
+  id: "gain-1",
+  descricao: "Pagamento da ordem de serviço",
+  valor: 850.00,
+  data: "2026-11-04",
+  categoria: "Serviços",
+  conta_id: "acc-1",
+  ordem_id: "os-1"
+}
+```
+
+O saldo atual de cada conta é calculado como `saldo inicial + ganhos vinculados - gastos vinculados`.
+Ganhos e gastos podem ser criados diretamente nas abas correspondentes ou pelos atalhos da ordem de serviço.
 
 ### 📋 Ordens de Serviço (`service_orders`)
 ```javascript

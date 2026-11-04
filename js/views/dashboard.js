@@ -40,6 +40,7 @@ const DashboardView = {
   async render(container) {
     const accounts = await Storage.get('accounts');
     const expenses = await Storage.get('expenses');
+    const gains = await Storage.get('gains');
     const investments = await Storage.get('investments');
     const sos = await Storage.get('service_orders');
 
@@ -49,9 +50,15 @@ const DashboardView = {
 
     const thisMonth = expenses.filter(e => e.data >= monthStart && e.data <= monthEnd);
     const totalExpensesThisMonth = thisMonth.reduce((s, e) => s + (parseFloat(e.valor) || 0), 0);
+    const totalGains = gains.reduce((s, item) => s + (parseFloat(item.valor) || 0), 0);
     const totalInvestments = investments.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0);
     const openSOs = sos.filter(s => s.status === 'aberta' || s.status === 'em_andamento').length;
-    const totalBankBalance = accounts.reduce((s, a) => s + (parseFloat(a.saldo) || 0), 0);
+    const accountBalances = Object.fromEntries(accounts.map(account => {
+      const incoming = gains.filter(item => item.conta_id === account.id).reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
+      const outgoing = expenses.filter(item => item.conta_id === account.id).reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
+      return [account.id, (Number(account.saldo) || 0) + incoming - outgoing];
+    }));
+    const totalBankBalance = Object.values(accountBalances).reduce((sum, value) => sum + value, 0);
 
     // Mapeamento de clientes para as ordens de serviço
     const clients = await Storage.get('clients');
@@ -89,6 +96,11 @@ const DashboardView = {
           <div class="card-title">
             <span>Gastos do Mês</span>
             <i class="fas fa-arrow-trend-down"></i>
+          </div>
+
+          <div class="card">
+            <div class="card-title"><span>Ganhos Registrados</span><i class="fas fa-arrow-trend-up"></i></div>
+            <div class="stat"><span class="stat-value" style="color:var(--success);">${formatBRL(totalGains)}</span><span class="stat-label">${gains.length} lançamentos</span></div>
           </div>
           <div class="stat">
             <span class="stat-value ${totalExpensesThisMonth > 0 ? 'up' : ''}">
@@ -143,7 +155,7 @@ const DashboardView = {
                     <td><strong>${escapeHtml(a.banco)}</strong></td>
                     <td>${escapeHtml(a.titular)}</td>
                     <td><span class="badge badge-default">${escapeHtml(a.tipo || 'Corrente')}</span></td>
-                    <td style="font-weight:700;color:var(--success);">${formatBRL(a.saldo)}</td>
+                    <td style="font-weight:700;color:var(--success);">${formatBRL(accountBalances[a.id])}</td>
                   </tr>
                 `).join('') || '<tr><td colspan="4" style="color:var(--text-muted);text-align:center;padding:24px;">Nenhuma conta encontrada.</td></tr>'}
               </tbody>

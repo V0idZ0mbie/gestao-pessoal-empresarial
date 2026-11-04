@@ -124,6 +124,24 @@ test('Storage converte clienteId para cliente_id no Supabase e normaliza a respo
   assert.equal(item.clienteId, 'client-1');
 });
 
+test('lançamentos de ganhos e gastos podem ser vinculados à mesma conta e ordem', async () => {
+  const context = createContext();
+  context.sessionStorage.setItem('gp_userId', 'user-a');
+  load(context, 'js/storage.js');
+
+  const account = await context.Storage.add('accounts', { banco: 'Banco', titular: 'Conta', saldo: 100 });
+  const order = await context.Storage.add('service_orders', { clienteId: 'client-1', descricao: 'Serviço' });
+  const gain = await context.Storage.add('gains', { descricao: 'Pagamento', valor: 250, conta_id: account.id, ordem_id: order.id });
+  const expense = await context.Storage.add('expenses', { descricao: 'Material', valor: 50, conta_id: account.id, ordem_id: order.id });
+
+  assert.equal(gain.conta_id, account.id);
+  assert.equal(gain.ordem_id, order.id);
+  assert.equal(expense.conta_id, account.id);
+  assert.equal(expense.ordem_id, order.id);
+  assert.equal((await context.Storage.get('gains')).length, 1);
+  assert.equal((await context.Storage.get('expenses')).length, 1);
+});
+
 test('autenticação offline registra, autentica e encerra sessão', async () => {
   const context = createContext();
   load(context, 'js/auth.js');
@@ -163,6 +181,7 @@ test('rotas protegidas e telas públicas permanecem registradas', () => {
     'js/modules/accounts.js',
     'js/modules/clients.js',
     'js/modules/expenses.js',
+    'js/modules/gains.js',
     'js/modules/investments.js',
     'js/modules/service-orders.js',
     'js/modules/services-catalog.js',
@@ -171,7 +190,7 @@ test('rotas protegidas e telas públicas permanecem registradas', () => {
 
   const routes = vm.runInContext('ROUTES', context);
   assert.deepEqual(Object.keys(routes).sort(), [
-    'accounts', 'cadastros', 'clients', 'dashboard', 'expenses',
+    'accounts', 'cadastros', 'clients', 'dashboard', 'expenses', 'gains',
     'investments', 'login', 'register', 'service-orders', 'services'
   ].sort());
   assert.equal(routes.login.needsAuth, false);

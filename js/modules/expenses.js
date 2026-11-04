@@ -57,6 +57,7 @@ const ExpensesModule = (() => {
 
   async function renderList(container) {
     const items = await Storage.get(COLLECTION);
+    const accounts = await Storage.get('accounts');
     const totalGasto = items.reduce((acc, curr) => acc + (parseFloat(curr.valor) || 0), 0);
 
     // Aplica ordenação atual
@@ -81,6 +82,7 @@ const ExpensesModule = (() => {
               ${getSortableHeader('descricao', 'Descrição')}
               ${getSortableHeader('categoria', 'Categoria')}
               ${getSortableHeader('valor', 'Valor (R$)')}
+              ${getSortableHeader('conta_id', 'Conta')}
               <th style="text-align:right;">Ações</th>
             </tr>
           </thead>
@@ -94,6 +96,7 @@ const ExpensesModule = (() => {
                 </td>
                 <td><span class="badge badge-default">${escapeHtml(e.categoria || 'Geral')}</span></td>
                 <td style="font-weight:700;color:var(--danger);">${formatBRL(e.valor)}</td>
+                <td>${escapeHtml(accounts.find(a => a.id === e.conta_id)?.banco || '—')}</td>
                 <td style="white-space:nowrap;text-align:right;">
                   <button class="btn btn-sm btn-ghost" onclick="ExpensesModule.openForm('${e.id}')" title="Editar">
                     <i class="fas fa-pencil-alt"></i>
@@ -103,7 +106,7 @@ const ExpensesModule = (() => {
                   </button>
                 </td>
               </tr>
-            `).join('') || '<tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhum gasto registrado. Clique em "Novo Lançamento" para cadastrar.</td></tr>'}
+            `).join('') || '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhum gasto registrado. Clique em "Novo Lançamento" para cadastrar.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -120,10 +123,11 @@ const ExpensesModule = (() => {
     await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
   }
 
-  async function openForm(id) {
+  async function openForm(id, ordemId = '') {
     const items = await Storage.get(COLLECTION);
     const item = id ? items.find(e => e.id === id) : null;
     const accounts = await Storage.get('accounts');
+    const orders = await Storage.get('service_orders');
     const overlay = document.getElementById('modal-overlay');
 
     const defaultDate = item?.data || new Date().toISOString().slice(0, 10);
@@ -162,6 +166,13 @@ const ExpensesModule = (() => {
               ${accounts.map(a => `<option value="${a.id}" ${item?.conta_id === a.id ? 'selected' : ''}>${escapeHtml(a.banco)} - Saldo: ${formatBRL(a.saldo)}</option>`).join('')}
             </select>
           </div>
+          <div class="form-group">
+            <label>Ordem de serviço (opcional)</label>
+            <select id="f-ordem">
+              <option value="">Nenhuma</option>
+              ${orders.map(o => `<option value="${o.id}" ${(item?.ordem_id || ordemId) === o.id ? 'selected' : ''}>${escapeHtml(o.descricao || o.id)}</option>`).join('')}
+            </select>
+          </div>
         `;
 
     document.getElementById('modal-submit').textContent = item ? 'Salvar Alterações' : 'Registrar Gasto';
@@ -172,13 +183,14 @@ const ExpensesModule = (() => {
       const data = document.getElementById('f-data').value || new Date().toISOString().slice(0, 10);
       const categoria = document.getElementById('f-categoria').value;
       const conta_id = document.getElementById('f-conta').value || null;
+      const ordem_id = document.getElementById('f-ordem').value || null;
 
       if (!descricao || valor <= 0) {
         Toast.show('Preencha a descrição e um valor válido maior que zero.', 'error');
         return;
       }
 
-      const payload = { descricao, valor, data, categoria, conta_id };
+      const payload = { descricao, valor, data, categoria, conta_id, ordem_id };
 
       try {
         if (item) {
