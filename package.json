@@ -1,0 +1,7 @@
+{
+  "name": "gestao-pessoal-empresarial",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/system.test.js"
+  }
+}

@@ -94,6 +94,18 @@ Para adicionar um novo módulo:
 2. Siga o padrão dos módulos existentes
 3. Registre a rota no `js/app.js`
 
+## Testes automatizados
+
+O projeto possui uma suíte sem dependências externas, baseada no `node:test`. Ela valida o carregamento dos scripts referenciados pelo HTML, rotas, módulos, autenticação offline, CRUD local, isolamento por usuário, integração de campos com o Supabase e ordenação de tabelas.
+
+Execute antes de publicar alterações:
+
+```bash
+npm test
+```
+
+Ao adicionar uma nova rota, módulo ou operação de persistência, inclua um caso em `tests/system.test.js`.
+
 ## Licença
 
 MIT

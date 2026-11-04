@@ -26,7 +26,7 @@ const SortHelper = {
     const state = this.states[column] || 'none';
     const icon = this.getIcon(column);
     return `
-      <th class="sortable-header" data-column="${column}" onclick="SortHelper.renderSorted('${column}')>
+      <th class="sortable-header" data-column="${column}" onclick="SortHelper.renderSorted('${column}')">
         ${label}
         <i class="fas ${icon}" style="margin-left:6px;font-size:0.8em;"></i>
       </th>
