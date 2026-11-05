@@ -9,6 +9,7 @@ const ServiceOrdersModule = (() => {
     column: null, // 'cliente', 'valor', 'data', 'status'
     direction: 'asc' // 'asc' or 'desc'
   };
+  const selectedOrderIds = new Set();
 
   function getSortIcon() {
     const icons = {
@@ -67,6 +68,10 @@ const ServiceOrdersModule = (() => {
     const accountMap = Object.fromEntries(accounts.map(account => [account.id, `${account.banco} - ${account.titular}`]));
 
     const totalValor = items.reduce((acc, curr) => acc + (parseFloat(curr.valor) || 0), 0);
+    const availableIds = new Set(items.map(item => item.id));
+    selectedOrderIds.forEach(id => {
+      if (!availableIds.has(id)) selectedOrderIds.delete(id);
+    });
 
     // Aplica ordenação atual
     const sortedItems = sortItems(items, sortState.column);
@@ -77,15 +82,23 @@ const ServiceOrdersModule = (() => {
           <h1>Ordens de Serviço (OS)</h1>
           <p class="subtitle">Acompanhe projetos, orçamentos e serviços contratados | Total: <strong>${formatBRL(totalValor)}</strong></p>
         </div>
-        <button class="btn btn-primary" onclick="ServiceOrdersModule.openForm()">
-          <i class="fas fa-plus"></i> Nova Ordem de Serviço
-        </button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+          <button id="generate-quotes-btn" class="btn btn-ghost" onclick="ServiceOrdersModule.generateQuotePdf()" ${selectedOrderIds.size ? '' : 'disabled'}>
+            <i class="fas fa-file-pdf"></i> Gerar orçamento${selectedOrderIds.size ? ` (${selectedOrderIds.size})` : ''}
+          </button>
+          <button class="btn btn-primary" onclick="ServiceOrdersModule.openForm()">
+            <i class="fas fa-plus"></i> Nova Ordem de Serviço
+          </button>
+        </div>
       </div>
 
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
+              <th style="width:42px;text-align:center;">
+                <input type="checkbox" aria-label="Selecionar todas as ordens visíveis" onchange="ServiceOrdersModule.toggleAllSelection(this.checked)" ${items.length && selectedOrderIds.size === items.length ? 'checked' : ''}>
+              </th>
               ${getSortableHeader('cliente', 'Cliente Vinculado')}
               ${getSortableHeader('descricao', 'Descrição do Serviço')}
               ${getSortableHeader('valor', 'Preço')}
@@ -104,6 +117,9 @@ const ServiceOrdersModule = (() => {
               const paymentClass = so.pago ? 'success' : 'warning';
               return `
                 <tr>
+                  <td style="text-align:center;">
+                    <input type="checkbox" aria-label="Selecionar orçamento de ${escapeHtml(clientName)}" onchange="ServiceOrdersModule.toggleSelection('${so.id}', this.checked)" ${selectedOrderIds.has(so.id) ? 'checked' : ''}>
+                  </td>
                   <td style="font-weight:700;">
                     <i class="fas fa-briefcase" style="color:var(--primary);margin-right:8px;"></i>
                     ${escapeHtml(clientName)}
@@ -134,11 +150,99 @@ const ServiceOrdersModule = (() => {
                   </td>
                 </tr>
               `;
-            }).join('') || '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhuma Ordem de Serviço cadastrada. Clique em "Nova Ordem de Serviço" para emitir uma.</td></tr>'}
+            }).join('') || '<tr><td colspan="8" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhuma Ordem de Serviço cadastrada. Clique em "Nova Ordem de Serviço" para emitir uma.</td></tr>'}
           </tbody>
         </table>
       </div>
     `;
+  }
+
+  function toggleSelection(id, checked) {
+    if (checked) selectedOrderIds.add(id);
+    else selectedOrderIds.delete(id);
+
+    const button = document.getElementById('generate-quotes-btn');
+    if (button) {
+      button.disabled = selectedOrderIds.size === 0;
+      button.innerHTML = `<i class="fas fa-file-pdf"></i> Gerar orçamento${selectedOrderIds.size ? ` (${selectedOrderIds.size})` : ''}`;
+    }
+  }
+
+  function toggleAllSelection(checked) {
+    document.querySelectorAll('input[aria-label^="Selecionar orçamento de"]').forEach(input => {
+      input.checked = checked;
+      const id = input.getAttribute('onchange').match(/'([^']+)'/)[1];
+      if (checked) selectedOrderIds.add(id);
+      else selectedOrderIds.delete(id);
+    });
+    const button = document.getElementById('generate-quotes-btn');
+    if (button) {
+      button.disabled = selectedOrderIds.size === 0;
+      button.innerHTML = `<i class="fas fa-file-pdf"></i> Gerar orçamento${selectedOrderIds.size ? ` (${selectedOrderIds.size})` : ''}`;
+    }
+  }
+
+  async function generateQuotePdf() {
+    const [items, clients] = await Promise.all([Storage.get(COLLECTION), Storage.get('clients')]);
+    const selectedItems = items.filter(item => selectedOrderIds.has(item.id));
+    if (!selectedItems.length) {
+      Toast.show('Selecione pelo menos uma ordem de serviço para gerar o orçamento.', 'error');
+      return;
+    }
+
+    const clientMap = Object.fromEntries(clients.map(client => [client.id, client]));
+    const generatedAt = new Date().toLocaleDateString('pt-BR');
+    const quoteRows = selectedItems.map(item => {
+      const client = clientMap[item.clienteId] || {};
+      return `
+        <section class="quote">
+          <div class="quote-header">
+            <div>
+              <h2>Orçamento de Serviço</h2>
+              <p>Emitido em ${generatedAt}</p>
+            </div>
+            <strong>OS #${escapeHtml(item.id.slice(0, 8).toUpperCase())}</strong>
+          </div>
+          <div class="client">
+            <strong>Cliente</strong>
+            <span>${escapeHtml(client.nome || 'Cliente não informado')}</span>
+            ${client.empresa ? `<span>${escapeHtml(client.empresa)}</span>` : ''}
+            ${client.email ? `<span>${escapeHtml(client.email)}</span>` : ''}
+          </div>
+          <div class="service">
+            <strong>Serviço orçado</strong>
+            <p>${escapeHtml(item.descricao)}</p>
+          </div>
+          <div class="total">
+            <span>Valor total do orçamento</span>
+            <strong>${formatBRL(item.valor)}</strong>
+          </div>
+          ${item.obs ? `<p class="notes"><strong>Observações:</strong> ${escapeHtml(item.obs)}</p>` : ''}
+          <p class="validity">Este documento apresenta o valor orçado para o serviço descrito. A execução está sujeita à aprovação do cliente.</p>
+        </section>
+      `;
+    }).join('');
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      Toast.show('Não foi possível abrir o documento. Permita pop-ups para gerar o PDF.', 'error');
+      return;
+    }
+    printWindow.document.write(`<!doctype html>
+      <html lang="pt-BR"><head><meta charset="UTF-8"><title>Orçamento de Serviço</title>
+      <style>
+        *{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#172033;margin:0;padding:32px;background:#fff}
+        .quote{max-width:760px;margin:0 auto 36px;padding:32px;border:1px solid #dbe2ea;border-radius:10px;page-break-after:always}
+        .quote:last-child{page-break-after:auto}.quote-header{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid #2563eb;padding-bottom:18px}
+        h2{margin:0 0 6px;font-size:24px;color:#1d4ed8}.quote-header p,.validity{margin:0;color:#64748b;font-size:12px}
+        .client,.service{display:flex;flex-direction:column;gap:5px;margin-top:24px}.client strong,.service strong{color:#64748b;text-transform:uppercase;font-size:11px;letter-spacing:.08em}
+        .service p{margin:0;line-height:1.6}.total{display:flex;justify-content:space-between;align-items:center;margin-top:30px;padding:18px;background:#eff6ff;border-radius:8px}
+        .total strong{font-size:24px;color:#1d4ed8}.notes{margin-top:24px;line-height:1.5}.validity{margin-top:28px}
+        @media print{body{padding:0}.quote{border:0;margin:0;max-width:none;padding:20px}}
+      </style></head><body>${quoteRows}</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   }
 
   async function openForm(id) {
@@ -312,7 +416,10 @@ const ServiceOrdersModule = (() => {
     await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
   }
 
-  return { render: renderList, renderList, openForm, deleteItem, closeModal, sortBy, togglePaymentFields };
+  return {
+    render: renderList, renderList, openForm, deleteItem, closeModal, sortBy,
+    togglePaymentFields, toggleSelection, toggleAllSelection, generateQuotePdf
+  };
 })();
 
 window.ServiceOrdersModule = ServiceOrdersModule;
