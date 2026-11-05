@@ -80,6 +80,9 @@ const DashboardView = {
           <p class="subtitle">Acompanhe a saúde financeira, clientes e histórico de ordens</p>
         </div>
         <div style="display:flex;gap:10px;">
+          ${window.SeedData ? `<button class="btn btn-ghost" onclick="DashboardView.importHistoricalData()">
+            <i class="fas fa-file-import"></i> Importar histórico
+          </button>` : ''}
           <a href="#/services" class="btn btn-ghost">
             <i class="fas fa-calculator"></i> Ver Tabela de Médias
           </a>
@@ -226,6 +229,29 @@ const DashboardView = {
     state.direction = state.column === column && state.direction === 'asc' ? 'desc' : 'asc';
     state.column = column;
     await this.render(document.getElementById('main-content'));
+  },
+
+  async importHistoricalData() {
+    if (!window.SeedData) {
+      Toast.show('Dados históricos não estão disponíveis para importação.', 'error');
+      return;
+    }
+    if (!confirm('Importar o histórico de clientes, ordens, contas e catálogo? Registros já importados não serão duplicados.')) return;
+
+    try {
+      const result = await window.SeedData.importAll();
+      const total = Object.values(result).reduce((sum, value) => sum + value, 0);
+      Toast.show(
+        total
+          ? `Histórico importado: ${total} registros novos.`
+          : 'O histórico já está importado. Nenhum registro novo foi criado.',
+        'success'
+      );
+      await this.render(document.getElementById('main-content'));
+    } catch (error) {
+      console.error('Erro ao importar histórico:', error);
+      Toast.show('Erro ao importar histórico: ' + error.message, 'error');
+    }
   },
 
 };

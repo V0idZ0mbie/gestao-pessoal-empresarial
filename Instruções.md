@@ -387,7 +387,40 @@ O documento contém:
 
 Se a janela não abrir, permita pop-ups para o site e tente novamente.
 
-## 9. Autenticação
+## 9. Importar o histórico do PDF antigo
+
+O arquivo histórico foi convertido para dados estruturados no `js/seed.js`. A base contém clientes, ordens de serviço, contas padrão e catálogo de serviços.
+
+Para importar pela interface:
+
+1. Faça login.
+2. Acesse `#/dashboard`.
+3. Clique em **Importar histórico**.
+4. Confirme a operação.
+5. Aguarde a mensagem de conclusão.
+6. Abra **Clientes**, **Ordens de Serviço** e **Valores Médios** para conferir os registros.
+
+O importador é idempotente: ele usa os IDs históricos e não cria duplicatas quando executado novamente. Os registros históricos são importados sem pagamento (`pago` falso), pois o PDF não informa quais serviços foram pagos. Revise os status e pagamentos antes de usar os dados como contabilidade.
+
+Também é possível executar a operação no console do navegador, depois que o sistema estiver carregado:
+
+```javascript
+const resultado = await SeedData.importAll();
+console.log(resultado);
+```
+
+O resultado informa quantos registros novos foram criados em cada coleção:
+
+```javascript
+{
+  importedAccounts,
+  importedClients,
+  importedOrders,
+  importedServices
+}
+```
+
+## 10. Autenticação
 
 Funções globais em `js/auth.js`:
 
@@ -406,7 +439,7 @@ Regras:
 - No modo offline, a sessão é mantida em `sessionStorage`.
 - No modo Supabase, a autenticação é feita pelo Supabase Auth.
 
-## 10. Supabase e migrações
+## 11. Supabase e migrações
 
 Configuração:
 
@@ -436,7 +469,7 @@ O Supabase usa `cliente_id`, enquanto o frontend usa `clienteId`. A conversão �
 
 Nunca coloque chaves privadas, tokens de serviço ou senhas no código do frontend.
 
-## 11. Como alterar o código
+## 12. Como alterar o código
 
 ### 11.1 Alterar uma tela existente
 
@@ -470,7 +503,7 @@ Nunca coloque chaves privadas, tokens de serviço ou senhas no código do fronte
 - Use `console.error` para falhas inesperadas de renderização.
 - Nunca confirme uma operação antes de verificar o retorno de `Storage`.
 
-## 12. Checklist final do Agente IA
+## 13. Checklist final do Agente IA
 
 Antes de informar que uma tarefa foi concluída:
 

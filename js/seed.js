@@ -4011,34 +4011,30 @@ window.MIGRATED_ORDERS = [
 
 window.SeedData = {
   async importAll() {
-    const now = new Date().toISOString();
+    const importCollection = async (collection, items) => {
+      let imported = 0;
+      for (const item of items) {
+        const existing = await Storage.find(collection, value => value.id === item.id);
+        if (!existing) {
+          await Storage.add(collection, item);
+          imported += 1;
+        }
+      }
+      return imported;
+    };
 
     // 1. Contas Padrão
     const accountsData = [
-      { banco: 'Nubank Principal', titular: 'Conta Principal', tipo: 'Conta Corrente', saldo: 12450.00 },
-      { banco: 'Banco Inter', titular: 'Reserva Operacional', tipo: 'Poupança', saldo: 8300.00 },
-      { banco: 'Caixa Econômica', titular: 'Recebimentos de Obras', tipo: 'Conta Corrente', saldo: 5400.00 }
+      { id: 'acc-historical-1', banco: 'Nubank Principal', titular: 'Conta Principal', tipo: 'Conta Corrente', saldo: 12450.00 },
+      { id: 'acc-historical-2', banco: 'Banco Inter', titular: 'Reserva Operacional', tipo: 'Poupança', saldo: 8300.00 },
+      { id: 'acc-historical-3', banco: 'Caixa Econômica', titular: 'Recebimentos de Obras', tipo: 'Conta Corrente', saldo: 5400.00 }
     ];
 
-    for (const acc of accountsData) {
-      await Storage.add('accounts', acc);
-    }
+    const importedAccounts = await importCollection('accounts', accountsData);
+    const importedClients = await importCollection('clients', window.MIGRATED_CLIENTS);
+    const importedOrders = await importCollection('service_orders', window.MIGRATED_ORDERS);
+    const importedServices = await importCollection('services_catalog', window.MIGRATED_SERVICES_CATALOG);
 
-    // 2. Importar Clientes Migrados
-    for (const cli of window.MIGRATED_CLIENTS) {
-      await Storage.add('clients', cli);
-    }
-
-    // 3. Importar Ordens de Serviço Migradas
-    for (const ord of window.MIGRATED_ORDERS) {
-      await Storage.add('service_orders', ord);
-    }
-
-    // 4. Salvar Tabela de Serviços e Médias no Storage
-    for (const s of window.MIGRATED_SERVICES_CATALOG) {
-      await Storage.add('services_catalog', s);
-    }
-
-    return true;
+    return { importedAccounts, importedClients, importedOrders, importedServices };
   }
 };

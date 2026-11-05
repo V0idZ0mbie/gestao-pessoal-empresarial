@@ -27,7 +27,7 @@ Este manual fornece instruções diretas, claras e estruturadas para que qualque
 │   ├── auth.js                  # Login, registro, logout e verificação de autenticação
 │   ├── storage.js               # Camada de persistência híbrida (Supabase + Fallback LocalStorage)
 │   ├── toast.js                 # Feedback visual flutuante (Toast.show)
-│   ├── seed.js                  # Banco migrado e dados iniciais (71 clientes, 321 ordens de serviço, catálogo)
+│   ├── seed.js                  # Banco migrado e dados iniciais (71 clientes, 322 ordens de serviço, catálogo)
 │   ├── views/
 │   │   ├── auth.js              # Telas de login e cadastro (#/login e #/register)
 │   │   └── dashboard.js         # Painel geral com métricas (#/dashboard)
