@@ -9,7 +9,8 @@ Dashboard 100% estático em HTML/CSS/JavaScript, hospedável em qualquer endpoin
 - 💰 **Gastos** — Registrar gastos com valor, data, categoria e descrição
 - 💵 **Ganhos** — Registrar receitas vinculadas a contas e ordens de serviço
 - 📈 **Investimentos** — Registrar investimentos (tipo, valor, data, lucro/reelei)
-- 🔧 **Ordens de serviço** — Gerar e acompanhar OLS com status (aberta, em andamento, concluída)
+- 🔧 **Ordens de serviço** — Gerar e acompanhar OS por orçamento, andamento e conclusão; registrar pagamento, forma e conta de recebimento
+- 📊 **Análise na Dashboard** — Visualizar ordens em orçamento, aguardando conclusão, aguardando pagamento e finalizadas
 - 📋 **Cadastros** — Geral de cadastros
 
 ## Arquitetura

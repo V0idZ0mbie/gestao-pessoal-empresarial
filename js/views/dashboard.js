@@ -52,7 +52,13 @@ const DashboardView = {
     const totalExpensesThisMonth = thisMonth.reduce((s, e) => s + (parseFloat(e.valor) || 0), 0);
     const totalGains = gains.reduce((s, item) => s + (parseFloat(item.valor) || 0), 0);
     const totalInvestments = investments.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0);
-    const openSOs = sos.filter(s => s.status === 'aberta' || s.status === 'em_andamento').length;
+    const orderAnalysis = {
+      orcamento: sos.filter(s => s.status === 'aberta').length,
+      aguardandoConclusao: sos.filter(s => s.status === 'em_andamento').length,
+      aguardandoPagamento: sos.filter(s => s.status === 'concluida' && !s.pago).length,
+      finalizadas: sos.filter(s => s.pago).length
+    };
+    const openSOs = orderAnalysis.orcamento + orderAnalysis.aguardandoConclusao;
     const accountBalances = Object.fromEntries(accounts.map(account => {
       const incoming = gains.filter(item => item.conta_id === account.id).reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
       const outgoing = expenses.filter(item => item.conta_id === account.id).reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
@@ -130,6 +136,19 @@ const DashboardView = {
             <span class="stat-value ${openSOs > 0 ? 'up' : ''}">${openSOs}</span>
             <span class="stat-label">demandas em execução</span>
           </div>
+        </div>
+      </div>
+
+      <div class="list-card" style="margin-bottom:24px;">
+        <div class="list-card-header">
+          <h2>Análise das Ordens de Serviço</h2>
+          <a href="#/service-orders" class="btn btn-sm btn-ghost">Gerenciar OS <i class="fas fa-arrow-right"></i></a>
+        </div>
+        <div class="cards" style="padding:0 20px 20px;">
+          <div class="card"><div class="card-title"><span>Em orçamento</span><i class="fas fa-file-invoice"></i></div><div class="stat"><span class="stat-value">${orderAnalysis.orcamento}</span><span class="stat-label">aguardando aprovação</span></div></div>
+          <div class="card"><div class="card-title"><span>Aguardando conclusão</span><i class="fas fa-hourglass-half"></i></div><div class="stat"><span class="stat-value">${orderAnalysis.aguardandoConclusao}</span><span class="stat-label">em andamento</span></div></div>
+          <div class="card"><div class="card-title"><span>Aguardando pagamento</span><i class="fas fa-money-bill-wave"></i></div><div class="stat"><span class="stat-value">${orderAnalysis.aguardandoPagamento}</span><span class="stat-label">concluídas sem pagamento</span></div></div>
+          <div class="card"><div class="card-title"><span>Finalizadas</span><i class="fas fa-check-circle"></i></div><div class="stat"><span class="stat-value" style="color:var(--success);">${orderAnalysis.finalizadas}</span><span class="stat-label">serviço e pagamento concluídos</span></div></div>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 // ============ Ordens de Serviço ============
-// CRUD de OS: cliente, descrição, valor, status, data de abertura, observações.
+// CRUD de OS: cliente, descrição, valor, status, pagamento, data e observações.
 
 const ServiceOrdersModule = (() => {
   const COLLECTION = 'service_orders';
@@ -61,9 +61,10 @@ const ServiceOrdersModule = (() => {
 
   async function renderList(container) {
     const items = await Storage.get(COLLECTION);
-    const clients = await Storage.get('clients');
+    const [clients, accounts] = await Promise.all([Storage.get('clients'), Storage.get('accounts')]);
     const clientMap = {};
     clients.forEach(c => { clientMap[c.id] = c.nome; });
+    const accountMap = Object.fromEntries(accounts.map(account => [account.id, `${account.banco} - ${account.titular}`]));
 
     const totalValor = items.reduce((acc, curr) => acc + (parseFloat(curr.valor) || 0), 0);
 
@@ -90,6 +91,7 @@ const ServiceOrdersModule = (() => {
               ${getSortableHeader('valor', 'Preço')}
               ${getSortableHeader('data', 'Data de Abertura')}
               ${getSortableHeader('status', 'Status Atual')}
+              <th>Pagamento</th>
               <th style="text-align:right;">Ações</th>
             </tr>
           </thead>
@@ -98,6 +100,8 @@ const ServiceOrdersModule = (() => {
               const clientName = clientMap[so.clienteId] || '—';
               const badgeClass = so.status === 'concluida' ? 'success' : (so.status === 'em_andamento' ? 'warning' : 'info');
               const statusName = so.status === 'concluida' ? 'Concluída' : (so.status === 'em_andamento' ? 'Em Andamento' : 'Aberta');
+              const paymentLabel = so.pago ? 'Pago' : 'Aguardando pagamento';
+              const paymentClass = so.pago ? 'success' : 'warning';
               return `
                 <tr>
                   <td style="font-weight:700;">
@@ -110,6 +114,10 @@ const ServiceOrdersModule = (() => {
                   <td style="font-weight:700;color:var(--success);">${formatBRL(so.valor)}</td>
                   <td>${so.data_abertura ? new Date(so.data_abertura + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
                   <td><span class="badge badge-${badgeClass}">${statusName}</span></td>
+                  <td>
+                    <span class="badge badge-${paymentClass}">${paymentLabel}</span>
+                    ${so.pago ? `<small style="display:block;color:var(--text-muted);">${escapeHtml(so.forma_pagamento || 'Forma não informada')} · ${escapeHtml(accountMap[so.conta_pagamento_id] || 'Conta não informada')}</small>` : ''}
+                  </td>
                   <td style="white-space:nowrap;text-align:right;">
                     <button class="btn btn-sm btn-ghost" onclick="GainsModule.openForm(null, '${so.id}')" title="Registrar ganho desta OS">
                       <i class="fas fa-arrow-up"></i>
@@ -126,7 +134,7 @@ const ServiceOrdersModule = (() => {
                   </td>
                 </tr>
               `;
-            }).join('') || '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhuma Ordem de Serviço cadastrada. Clique em "Nova Ordem de Serviço" para emitir uma.</td></tr>'}
+            }).join('') || '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhuma Ordem de Serviço cadastrada. Clique em "Nova Ordem de Serviço" para emitir uma.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -137,6 +145,7 @@ const ServiceOrdersModule = (() => {
     const items = await Storage.get(COLLECTION);
     const so = id ? items.find(s => s.id === id) : null;
     const clients = await Storage.get('clients');
+    const accounts = await Storage.get('accounts');
     const overlay = document.getElementById('modal-overlay');
 
     const defaultDate = so?.data_abertura || new Date().toISOString().slice(0, 10);
@@ -172,6 +181,29 @@ const ServiceOrdersModule = (() => {
         </select>
       </div>
       <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input id="f-pago" type="checkbox" ${so?.pago ? 'checked' : ''} onchange="ServiceOrdersModule.togglePaymentFields()" />
+          Serviço pago
+        </label>
+      </div>
+      <div id="payment-fields" style="${so?.pago ? '' : 'display:none;'}">
+        <div class="form-group">
+          <label>Forma de pagamento *</label>
+          <select id="f-forma-pagamento">
+            <option value="">— Selecione —</option>
+            ${['Pix', 'Transferência', 'Cartão de crédito', 'Cartão de débito', 'Dinheiro', 'Boleto'].map(method => `<option value="${method}" ${so?.forma_pagamento === method ? 'selected' : ''}>${method}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Conta que recebeu o pagamento *</label>
+          <select id="f-conta-pagamento">
+            <option value="">— Selecione a conta —</option>
+            ${accounts.map(account => `<option value="${account.id}" ${so?.conta_pagamento_id === account.id ? 'selected' : ''}>${escapeHtml(account.banco)} - ${escapeHtml(account.titular)}</option>`).join('')}
+          </select>
+          ${accounts.length === 0 ? '<small style="color:var(--warning);display:block;margin-top:4px;">Cadastre uma conta antes de registrar um pagamento.</small>' : ''}
+        </div>
+      </div>
+      <div class="form-group">
         <label>Observações Adicionais</label>
         <textarea id="f-obs" rows="2" placeholder="Termos de entrega, prazos, formas de pagamento">${escapeHtml(so?.obs || '')}</textarea>
       </div>
@@ -186,6 +218,9 @@ const ServiceOrdersModule = (() => {
       const data = document.getElementById('f-data').value || new Date().toISOString().slice(0, 10);
       const status = document.getElementById('f-status').value;
       const obs = document.getElementById('f-obs').value.trim();
+      const pago = document.getElementById('f-pago').checked;
+      const formaPagamento = pago ? document.getElementById('f-forma-pagamento').value : null;
+      const contaPagamentoId = pago ? document.getElementById('f-conta-pagamento').value : null;
 
       if (!clienteId) {
         Toast.show('Selecione um cliente para vincular à ordem.', 'error');
@@ -195,15 +230,43 @@ const ServiceOrdersModule = (() => {
         Toast.show('Preencha a descrição do serviço e informe um valor válido.', 'error');
         return;
       }
+      if (pago && (!formaPagamento || !contaPagamentoId)) {
+        Toast.show('Informe a forma de pagamento e a conta que recebeu o valor.', 'error');
+        return;
+      }
 
-      const payload = { clienteId, descricao, valor, data_abertura: data, status, obs };
+      const payload = {
+        clienteId, descricao, valor, data_abertura: data, status, obs, pago,
+        forma_pagamento: formaPagamento, conta_pagamento_id: contaPagamentoId,
+        data_pagamento: pago ? (so?.data_pagamento || new Date().toISOString().slice(0, 10)) : null
+      };
 
       try {
+        const savedOrder = so
+          ? await Storage.update(COLLECTION, so.id, payload)
+          : await Storage.add(COLLECTION, payload);
+        const gains = await Storage.get('gains');
+        const paymentGain = gains.find(gain => gain.ordem_id === savedOrder.id && gain.origem === 'service_order_payment');
+
+        if (pago) {
+          const gainPayload = {
+            descricao: `Pagamento - ${descricao}`,
+            valor,
+            data: payload.data_pagamento,
+            categoria: 'Pagamento de OS',
+            conta_id: contaPagamentoId,
+            ordem_id: savedOrder.id,
+            origem: 'service_order_payment'
+          };
+          if (paymentGain) await Storage.update('gains', paymentGain.id, gainPayload);
+          else await Storage.add('gains', gainPayload);
+        } else if (paymentGain) {
+          await Storage.remove('gains', paymentGain.id);
+        }
+
         if (so) {
-          await Storage.update(COLLECTION, so.id, payload);
           Toast.show('Ordem de serviço atualizada com sucesso!', 'success');
         } else {
-          await Storage.add(COLLECTION, payload);
           Toast.show('Ordem de serviço aberta com sucesso!', 'success');
         }
         closeModal();
@@ -223,6 +286,9 @@ const ServiceOrdersModule = (() => {
 
     try {
       await Storage.remove(COLLECTION, id);
+      const gains = await Storage.get('gains');
+      const paymentGain = gains.find(gain => gain.ordem_id === id && gain.origem === 'service_order_payment');
+      if (paymentGain) await Storage.remove('gains', paymentGain.id);
       Toast.show('Ordem de serviço excluída.', 'success');
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     } catch (err) {
@@ -234,13 +300,19 @@ const ServiceOrdersModule = (() => {
     document.getElementById('modal-overlay').classList.remove('open');
   }
 
+  function togglePaymentFields() {
+    const checkbox = document.getElementById('f-pago');
+    const fields = document.getElementById('payment-fields');
+    if (checkbox && fields) fields.style.display = checkbox.checked ? '' : 'none';
+  }
+
   async function sortBy(column) {
     sortState.direction = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
     sortState.column = column;
     await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
   }
 
-  return { render: renderList, renderList, openForm, deleteItem, closeModal, sortBy };
+  return { render: renderList, renderList, openForm, deleteItem, closeModal, sortBy, togglePaymentFields };
 })();
 
 window.ServiceOrdersModule = ServiceOrdersModule;

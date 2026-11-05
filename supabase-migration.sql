@@ -49,11 +49,13 @@ create table if not exists gains (
   categoria text,
   conta_id text,
   ordem_id text,
+  origem text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table expenses add column if not exists ordem_id text;
+alter table gains add column if not exists origem text;
 
 create table if not exists investments (
   id text primary key default gen_random_uuid()::text,
@@ -78,9 +80,18 @@ create table if not exists service_orders (
   data_fechamento date,
   status text not null default 'aberta',
   obs text,
+  pago boolean not null default false,
+  forma_pagamento text,
+  conta_pagamento_id text,
+  data_pagamento date,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table service_orders add column if not exists pago boolean not null default false;
+alter table service_orders add column if not exists forma_pagamento text;
+alter table service_orders add column if not exists conta_pagamento_id text;
+alter table service_orders add column if not exists data_pagamento date;
 
 create table if not exists services_catalog (
   id text primary key default gen_random_uuid()::text,
