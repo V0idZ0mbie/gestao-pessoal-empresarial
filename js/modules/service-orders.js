@@ -102,6 +102,33 @@ const ServiceOrdersModule = (() => {
         </div>
       </div>
 
+      <div class="bulk-actions" aria-label="Alterações em massa">
+        <strong><i class="fas fa-check-square"></i> ${selectedOrderIds.size || 'Nenhuma'} selecionada${selectedOrderIds.size === 1 ? '' : 's'}</strong>
+        <label>
+          Status da OS
+          <select id="bulk-status">
+            <option value="">— Não alterar —</option>
+            <option value="aberta">Aberta</option>
+            <option value="em_andamento">Em Andamento</option>
+            <option value="concluida">Concluída</option>
+          </select>
+        </label>
+        <button class="btn btn-sm btn-primary" onclick="ServiceOrdersModule.applyBulkStatus()" ${selectedOrderIds.size ? '' : 'disabled'}>
+          Aplicar status
+        </button>
+        <label>
+          Pagamento
+          <select id="bulk-payment">
+            <option value="">— Não alterar —</option>
+            <option value="paid">Pago</option>
+            <option value="pending">Aguardando pagamento</option>
+          </select>
+        </label>
+        <button class="btn btn-sm btn-primary" onclick="ServiceOrdersModule.applyBulkPayment()" ${selectedOrderIds.size ? '' : 'disabled'}>
+          Aplicar pagamento
+        </button>
+      </div>
+
       <div class="table-wrap">
         <table>
           <thead>
@@ -176,6 +203,7 @@ const ServiceOrdersModule = (() => {
       button.disabled = selectedOrderIds.size === 0;
       button.innerHTML = `<i class="fas fa-file-pdf"></i> Gerar orçamento${selectedOrderIds.size ? ` (${selectedOrderIds.size})` : ''}`;
     }
+    updateBulkActionsState();
   }
 
   function toggleAllSelection(checked) {
@@ -189,6 +217,103 @@ const ServiceOrdersModule = (() => {
     if (button) {
       button.disabled = selectedOrderIds.size === 0;
       button.innerHTML = `<i class="fas fa-file-pdf"></i> Gerar orçamento${selectedOrderIds.size ? ` (${selectedOrderIds.size})` : ''}`;
+    }
+    updateBulkActionsState();
+  }
+
+  function updateBulkActionsState() {
+    const hasSelection = selectedOrderIds.size > 0;
+    document.querySelectorAll('.bulk-actions button').forEach(button => {
+      button.disabled = !hasSelection;
+    });
+    const count = document.querySelector('.bulk-actions strong');
+    if (count) {
+      count.innerHTML = `<i class="fas fa-check-square"></i> ${selectedOrderIds.size || 'Nenhuma'} selecionada${selectedOrderIds.size === 1 ? '' : 's'}`;
+    }
+  }
+
+  async function applyBulkStatus() {
+    const status = document.getElementById('bulk-status')?.value;
+    if (!status || !selectedOrderIds.size) {
+      Toast.show('Selecione as ordens e o novo status da OS.', 'error');
+      return;
+    }
+
+    try {
+      const items = await Storage.get(COLLECTION);
+      const selectedItems = items.filter(item => selectedOrderIds.has(item.id));
+      await Promise.all(selectedItems.map(item => Storage.update(COLLECTION, item.id, { status })));
+      Toast.show(`Status atualizado em ${selectedItems.length} ordem(ns) de serviço.`, 'success');
+      await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
+    } catch (err) {
+      Toast.show('Erro ao atualizar o status em massa: ' + err.message, 'error');
+    }
+  }
+
+  async function syncServiceOrderFinancials(order) {
+    const gains = await Storage.get('gains');
+    const expenses = await Storage.get('expenses');
+    const revenue = gains.find(gain => gain.ordem_id === order.id && (
+      gain.origem === 'service_order_revenue' || gain.origem === 'service_order_payment'
+    ));
+    const repairCost = expenses.find(expense => (
+      expense.ordem_id === order.id && expense.origem === 'service_order_repair_cost'
+    ));
+    const revenuePayload = {
+      descricao: `Valor cobrado - ${order.descricao}`,
+      valor: order.valor,
+      data: order.data_abertura || new Date().toISOString().slice(0, 10),
+      categoria: 'Receita de OS',
+      conta_id: order.pago ? order.conta_pagamento_id : null,
+      ordem_id: order.id,
+      origem: 'service_order_revenue'
+    };
+    if (Number(order.valor) > 0) {
+      if (revenue) await Storage.update('gains', revenue.id, revenuePayload);
+      else await Storage.add('gains', revenuePayload);
+    } else if (revenue) {
+      await Storage.remove('gains', revenue.id);
+    }
+
+    if (repairCost && Number(order.custo_reparo) <= 0) {
+      await Storage.remove('expenses', repairCost.id);
+    } else if (Number(order.custo_reparo) > 0) {
+      const repairPayload = {
+        descricao: `Custo de reparo - ${order.descricao}`,
+        valor: order.custo_reparo,
+        data: order.data_abertura || new Date().toISOString().slice(0, 10),
+        categoria: 'Custo de reparo de OS',
+        conta_id: null,
+        ordem_id: order.id,
+        origem: 'service_order_repair_cost'
+      };
+      if (repairCost) await Storage.update('expenses', repairCost.id, repairPayload);
+      else await Storage.add('expenses', repairPayload);
+    }
+  }
+
+  async function applyBulkPayment() {
+    const paymentStatus = document.getElementById('bulk-payment')?.value;
+    if (!paymentStatus || !selectedOrderIds.size) {
+      Toast.show('Selecione as ordens e o novo status de pagamento.', 'error');
+      return;
+    }
+
+    try {
+      const items = await Storage.get(COLLECTION);
+      const selectedItems = items.filter(item => selectedOrderIds.has(item.id));
+      const pago = paymentStatus === 'paid';
+      for (const item of selectedItems) {
+        const updatedOrder = await Storage.update(COLLECTION, item.id, { pago });
+        await syncServiceOrderFinancials(updatedOrder || { ...item, pago });
+      }
+      const warning = pago && selectedItems.some(item => !item.forma_pagamento || !item.conta_pagamento_id)
+        ? ' Os detalhes de forma e conta devem ser preenchidos na edição individual.'
+        : '';
+      Toast.show(`Pagamento atualizado em ${selectedItems.length} ordem(ns) de serviço.${warning}`, 'success');
+      await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
+    } catch (err) {
+      Toast.show('Erro ao atualizar o pagamento em massa: ' + err.message, 'error');
     }
   }
 
@@ -391,24 +516,7 @@ const ServiceOrdersModule = (() => {
         const savedOrder = so
           ? await Storage.update(COLLECTION, so.id, payload)
           : await Storage.add(COLLECTION, payload);
-        const gains = await Storage.get('gains');
-        const paymentGain = gains.find(gain => gain.ordem_id === savedOrder.id && gain.origem === 'service_order_payment');
-
-        if (pago) {
-          const gainPayload = {
-            descricao: `Pagamento - ${descricao}`,
-            valor,
-            data: payload.data_pagamento,
-            categoria: 'Pagamento de OS',
-            conta_id: contaPagamentoId,
-            ordem_id: savedOrder.id,
-            origem: 'service_order_payment'
-          };
-          if (paymentGain) await Storage.update('gains', paymentGain.id, gainPayload);
-          else await Storage.add('gains', gainPayload);
-        } else if (paymentGain) {
-          await Storage.remove('gains', paymentGain.id);
-        }
+        await syncServiceOrderFinancials(savedOrder);
 
         if (so) {
           Toast.show('Ordem de serviço atualizada com sucesso!', 'success');
@@ -433,8 +541,15 @@ const ServiceOrdersModule = (() => {
     try {
       await Storage.remove(COLLECTION, id);
       const gains = await Storage.get('gains');
-      const paymentGain = gains.find(gain => gain.ordem_id === id && gain.origem === 'service_order_payment');
-      if (paymentGain) await Storage.remove('gains', paymentGain.id);
+      const expenses = await Storage.get('expenses');
+      await Promise.all(gains
+        .filter(gain => gain.ordem_id === id && (
+          gain.origem === 'service_order_revenue' || gain.origem === 'service_order_payment'
+        ))
+        .map(gain => Storage.remove('gains', gain.id)));
+      await Promise.all(expenses
+        .filter(expense => expense.ordem_id === id && expense.origem === 'service_order_repair_cost')
+        .map(expense => Storage.remove('expenses', expense.id)));
       Toast.show('Ordem de serviço excluída.', 'success');
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     } catch (err) {
@@ -460,7 +575,8 @@ const ServiceOrdersModule = (() => {
 
   return {
     render: renderList, renderList, openForm, deleteItem, closeModal, sortBy,
-    togglePaymentFields, toggleSelection, toggleAllSelection, generateQuotePdf, switchFormTab
+    togglePaymentFields, toggleSelection, toggleAllSelection, generateQuotePdf, switchFormTab,
+    applyBulkStatus, applyBulkPayment
   };
 })();
 

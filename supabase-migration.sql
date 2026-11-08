@@ -56,6 +56,7 @@ create table if not exists gains (
 
 alter table expenses add column if not exists ordem_id text;
 alter table gains add column if not exists origem text;
+alter table expenses add column if not exists origem text;
 
 create table if not exists investments (
   id text primary key default gen_random_uuid()::text,
