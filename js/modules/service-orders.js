@@ -33,7 +33,17 @@ const ServiceOrdersModule = (() => {
   }
 
   function sortItems(items, column) {
-    if (!column) return items;
+    if (!column) {
+      const statusOrder = { aberta: 1, em_andamento: 2, concluida: 3 };
+      return [...items].sort((a, b) => {
+        const statusDifference = (statusOrder[a.status] || 4) - (statusOrder[b.status] || 4);
+        if (statusDifference !== 0) return statusDifference;
+
+        const dateA = a.data_abertura ? new Date(a.data_abertura + 'T00:00:00').getTime() : 0;
+        const dateB = b.data_abertura ? new Date(b.data_abertura + 'T00:00:00').getTime() : 0;
+        return dateA - dateB;
+      });
+    }
     
     return [...items].sort((a, b) => {
       let valA = a[column] || (column === 'cliente' ? '' : column === 'status' ? '' : 0);
@@ -182,6 +192,17 @@ const ServiceOrdersModule = (() => {
     }
   }
 
+  function switchFormTab(tabName) {
+    document.querySelectorAll('.os-form-tab').forEach(tab => {
+      const isActive = tab.dataset.tab === tabName;
+      tab.classList.toggle('active', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    document.querySelectorAll('.os-form-tab-panel').forEach(panel => {
+      panel.classList.toggle('active', panel.dataset.tabPanel === tabName);
+    });
+  }
+
   async function generateQuotePdf() {
     const [items, clients] = await Promise.all([Storage.get(COLLECTION), Storage.get('clients')]);
     const selectedItems = items.filter(item => selectedOrderIds.has(item.id));
@@ -249,6 +270,9 @@ const ServiceOrdersModule = (() => {
     const items = await Storage.get(COLLECTION);
     const so = id ? items.find(s => s.id === id) : null;
     const clients = await Storage.get('clients');
+    const sortedClients = [...clients].sort((a, b) => (
+      (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })
+    ));
     const accounts = await Storage.get('accounts');
     const overlay = document.getElementById('modal-overlay');
 
@@ -256,60 +280,77 @@ const ServiceOrdersModule = (() => {
 
     document.getElementById('modal-title').textContent = so ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço';
     document.getElementById('modal-body').innerHTML = `
-      <div class="form-group">
-        <label>Cliente Beneficiário *</label>
-        <select id="f-cliente">
-          <option value="">— Selecione o Cliente —</option>
-          ${clients.map(c => `<option value="${c.id}" ${so?.clienteId === c.id ? 'selected' : ''}>${escapeHtml(c.nome)} ${c.empresa ? '(' + escapeHtml(c.empresa) + ')' : ''}</option>`).join('')}
-        </select>
-        ${clients.length === 0 ? '<small style="color:var(--warning);display:block;margin-top:4px;">Nenhum cliente cadastrado. Cadastre clientes no menu "Clientes" primeiro.</small>' : ''}
+      <div class="os-form-tabs" role="tablist" aria-label="Dados da ordem de serviço">
+        <button type="button" class="os-form-tab active" data-tab="order-data" role="tab" aria-selected="true" onclick="ServiceOrdersModule.switchFormTab('order-data')">
+          Dados da OS
+        </button>
+        <button type="button" class="os-form-tab" data-tab="internal-control" role="tab" aria-selected="false" onclick="ServiceOrdersModule.switchFormTab('internal-control')">
+          Controle interno
+        </button>
       </div>
-      <div class="form-group">
-        <label>Escopo do Serviço / Descrição *</label>
-        <textarea id="f-descricao" rows="2" placeholder="Descreva os serviços prestados ou tarefas a serem entregues">${escapeHtml(so?.descricao || '')}</textarea>
-      </div>
-      <div class="form-group">
-        <label>Valor Cobrado (R$) *</label>
-        <input id="f-valor" type="number" step="0.01" min="0" placeholder="0,00" value="${so ? so.valor : ''}" />
-      </div>
-      <div class="form-group">
-        <label>Data de Abertura / Início</label>
-        <input id="f-data" type="date" value="${defaultDate}" />
-      </div>
-      <div class="form-group">
-        <label>Situação / Status</label>
-        <select id="f-status">
-          <option value="aberta" ${so?.status === 'aberta' ? 'selected' : ''}>Aberta (Pendente / Aguardando)</option>
-          <option value="em_andamento" ${so?.status === 'em_andamento' ? 'selected' : ''}>Em Andamento (Em Execução)</option>
-          <option value="concluida" ${so?.status === 'concluida' ? 'selected' : ''}>Concluída (Finalizada)</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input id="f-pago" type="checkbox" ${so?.pago ? 'checked' : ''} onchange="ServiceOrdersModule.togglePaymentFields()" />
-          Serviço pago
-        </label>
-      </div>
-      <div id="payment-fields" style="${so?.pago ? '' : 'display:none;'}">
+      <div class="os-form-tab-panel active" data-tab-panel="order-data" role="tabpanel">
         <div class="form-group">
-          <label>Forma de pagamento *</label>
-          <select id="f-forma-pagamento">
-            <option value="">— Selecione —</option>
-            ${['Pix', 'Transferência', 'Cartão de crédito', 'Cartão de débito', 'Dinheiro', 'Boleto'].map(method => `<option value="${method}" ${so?.forma_pagamento === method ? 'selected' : ''}>${method}</option>`).join('')}
+          <label>Cliente Beneficiário *</label>
+          <select id="f-cliente">
+            <option value="">— Selecione o Cliente —</option>
+            ${sortedClients.map(c => `<option value="${c.id}" ${so?.clienteId === c.id ? 'selected' : ''}>${escapeHtml(c.nome)} ${c.empresa ? '(' + escapeHtml(c.empresa) + ')' : ''}</option>`).join('')}
+          </select>
+          ${clients.length === 0 ? '<small style="color:var(--warning);display:block;margin-top:4px;">Nenhum cliente cadastrado. Cadastre clientes no menu "Clientes" primeiro.</small>' : ''}
+        </div>
+        <div class="form-group">
+          <label>Escopo do Serviço / Descrição *</label>
+          <textarea id="f-descricao" rows="2" placeholder="Descreva os serviços prestados ou tarefas a serem entregues">${escapeHtml(so?.descricao || '')}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Valor Cobrado (R$) *</label>
+          <input id="f-valor" type="number" step="0.01" min="0" placeholder="0,00" value="${so ? so.valor : ''}" />
+        </div>
+        <div class="form-group">
+          <label>Data de Abertura / Início</label>
+          <input id="f-data" type="date" value="${defaultDate}" />
+        </div>
+        <div class="form-group">
+          <label>Situação / Status</label>
+          <select id="f-status">
+            <option value="aberta" ${so?.status === 'aberta' ? 'selected' : ''}>Aberta (Pendente / Aguardando)</option>
+            <option value="em_andamento" ${so?.status === 'em_andamento' ? 'selected' : ''}>Em Andamento (Em Execução)</option>
+            <option value="concluida" ${so?.status === 'concluida' ? 'selected' : ''}>Concluída (Finalizada)</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Conta que recebeu o pagamento *</label>
-          <select id="f-conta-pagamento">
-            <option value="">— Selecione a conta —</option>
-            ${accounts.map(account => `<option value="${account.id}" ${so?.conta_pagamento_id === account.id ? 'selected' : ''}>${escapeHtml(account.banco)} - ${escapeHtml(account.titular)}</option>`).join('')}
-          </select>
-          ${accounts.length === 0 ? '<small style="color:var(--warning);display:block;margin-top:4px;">Cadastre uma conta antes de registrar um pagamento.</small>' : ''}
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input id="f-pago" type="checkbox" ${so?.pago ? 'checked' : ''} onchange="ServiceOrdersModule.togglePaymentFields()" />
+            Serviço pago
+          </label>
+        </div>
+        <div id="payment-fields" style="${so?.pago ? '' : 'display:none;'}">
+          <div class="form-group">
+            <label>Forma de pagamento *</label>
+            <select id="f-forma-pagamento">
+              <option value="">— Selecione —</option>
+              ${['Pix', 'Transferência', 'Cartão de crédito', 'Cartão de débito', 'Dinheiro', 'Boleto'].map(method => `<option value="${method}" ${so?.forma_pagamento === method ? 'selected' : ''}>${method}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Conta que recebeu o pagamento *</label>
+            <select id="f-conta-pagamento">
+              <option value="">— Selecione a conta —</option>
+              ${accounts.map(account => `<option value="${account.id}" ${so?.conta_pagamento_id === account.id ? 'selected' : ''}>${escapeHtml(account.banco)} - ${escapeHtml(account.titular)}</option>`).join('')}
+            </select>
+            ${accounts.length === 0 ? '<small style="color:var(--warning);display:block;margin-top:4px;">Cadastre uma conta antes de registrar um pagamento.</small>' : ''}
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Observações Adicionais</label>
+          <textarea id="f-obs" rows="2" placeholder="Termos de entrega, prazos, formas de pagamento">${escapeHtml(so?.obs || '')}</textarea>
         </div>
       </div>
-      <div class="form-group">
-        <label>Observações Adicionais</label>
-        <textarea id="f-obs" rows="2" placeholder="Termos de entrega, prazos, formas de pagamento">${escapeHtml(so?.obs || '')}</textarea>
+      <div class="os-form-tab-panel" data-tab-panel="internal-control" role="tabpanel">
+        <div class="form-group">
+          <label>Custo do reparo (R$)</label>
+          <input id="f-custo-reparo" type="number" step="0.01" min="0" placeholder="0,00" value="${so?.custo_reparo ?? ''}" />
+          <small class="form-help">Informe o valor gasto no reparo. Este dado é apenas para controle interno e não será exibido na impressão.</small>
+        </div>
       </div>
     `;
 
@@ -319,6 +360,7 @@ const ServiceOrdersModule = (() => {
       const clienteId = document.getElementById('f-cliente').value;
       const descricao = document.getElementById('f-descricao').value.trim();
       const valor = parseFloat(document.getElementById('f-valor').value) || 0;
+      const custoReparo = parseFloat(document.getElementById('f-custo-reparo').value) || 0;
       const data = document.getElementById('f-data').value || new Date().toISOString().slice(0, 10);
       const status = document.getElementById('f-status').value;
       const obs = document.getElementById('f-obs').value.trim();
@@ -340,7 +382,7 @@ const ServiceOrdersModule = (() => {
       }
 
       const payload = {
-        clienteId, descricao, valor, data_abertura: data, status, obs, pago,
+        clienteId, descricao, valor, custo_reparo: custoReparo, data_abertura: data, status, obs, pago,
         forma_pagamento: formaPagamento, conta_pagamento_id: contaPagamentoId,
         data_pagamento: pago ? (so?.data_pagamento || new Date().toISOString().slice(0, 10)) : null
       };
@@ -418,7 +460,7 @@ const ServiceOrdersModule = (() => {
 
   return {
     render: renderList, renderList, openForm, deleteItem, closeModal, sortBy,
-    togglePaymentFields, toggleSelection, toggleAllSelection, generateQuotePdf
+    togglePaymentFields, toggleSelection, toggleAllSelection, generateQuotePdf, switchFormTab
   };
 })();
 

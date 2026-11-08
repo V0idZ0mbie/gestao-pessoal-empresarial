@@ -92,6 +92,7 @@ alter table service_orders add column if not exists pago boolean not null defaul
 alter table service_orders add column if not exists forma_pagamento text;
 alter table service_orders add column if not exists conta_pagamento_id text;
 alter table service_orders add column if not exists data_pagamento date;
+alter table service_orders add column if not exists custo_reparo numeric not null default 0;
 
 create table if not exists services_catalog (
   id text primary key default gen_random_uuid()::text,
