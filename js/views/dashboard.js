@@ -124,16 +124,22 @@ const DashboardView = {
             <span>Gastos do Mês</span>
             <i class="fas fa-arrow-trend-down"></i>
           </div>
-
-          <div class="card">
-            <div class="card-title"><span>Ganhos Registrados</span><i class="fas fa-arrow-trend-up"></i></div>
-            <div class="stat"><span class="stat-value" style="color:var(--success);">${dashboardMoney(totalGains)}</span><span class="stat-label">${gains.length} lançamentos</span></div>
-          </div>
           <div class="stat">
             <span class="stat-value ${totalExpensesThisMonth > 0 ? 'up' : ''}">
               ${dashboardMoney(totalExpensesThisMonth)}
             </span>
             <span class="stat-label">${thisMonth.length} lançamentos neste mês</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>Ganhos Registrados</span>
+            <i class="fas fa-arrow-trend-up"></i>
+          </div>
+          <div class="stat">
+            <span class="stat-value" style="color:var(--success);">${dashboardMoney(totalGains)}</span>
+            <span class="stat-label">${gains.length} lançamentos</span>
           </div>
         </div>
 
