@@ -271,11 +271,21 @@ test('dashboard exibe os gastos e ganhos vinculados a cada OS', async () => {
   load(context, 'js/views/dashboard.js');
 
   const container = { innerHTML: '' };
+  context.document.getElementById = id => id === 'main-content' ? container : null;
   await context.DashboardView.render(container);
 
   assert.match(container.innerHTML, /Gastos vinculados/);
   assert.match(container.innerHTML, /Recebido/);
   assert.match(container.innerHTML, /Reparo de equipamento/);
+  assert.match(container.innerHTML, /75,00/);
+  assert.match(container.innerHTML, /300,00/);
+  assert.match(container.innerHTML, /Ocultar valores/);
+
+  await context.DashboardView.togglePrivacy();
+  assert.doesNotMatch(container.innerHTML, /75,00|300,00/);
+  assert.match(container.innerHTML, /Mostrar valores/);
+
+  await context.DashboardView.togglePrivacy();
   assert.match(container.innerHTML, /75,00/);
   assert.match(container.innerHTML, /300,00/);
 });

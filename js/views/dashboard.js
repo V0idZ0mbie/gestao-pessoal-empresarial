@@ -6,6 +6,11 @@ const dashboardSortState = {
   accounts: { column: null, direction: 'asc' },
   orders: { column: null, direction: 'asc' }
 };
+let dashboardPrivacyMode = false;
+
+function dashboardMoney(value) {
+  return dashboardPrivacyMode ? '••••••' : formatBRL(value);
+}
 
 function dashboardSortHeader(type, column, label) {
   const state = dashboardSortState[type];
@@ -90,6 +95,9 @@ const DashboardView = {
           <p class="subtitle">Acompanhe a saúde financeira, clientes e histórico de ordens</p>
         </div>
         <div style="display:flex;gap:10px;">
+          <button class="btn btn-ghost" onclick="DashboardView.togglePrivacy()" aria-pressed="${dashboardPrivacyMode}" title="${dashboardPrivacyMode ? 'Mostrar valores' : 'Ocultar valores'}">
+            <i class="fas ${dashboardPrivacyMode ? 'fa-eye' : 'fa-eye-slash'}"></i> ${dashboardPrivacyMode ? 'Mostrar valores' : 'Ocultar valores'}
+          </button>
           ${window.SeedData ? `<button class="btn btn-ghost" onclick="DashboardView.importHistoricalData()">
             <i class="fas fa-file-import"></i> Importar histórico
           </button>` : ''}
@@ -106,7 +114,7 @@ const DashboardView = {
             <i class="fas fa-wallet"></i>
           </div>
           <div class="stat">
-            <span class="stat-value" style="color:var(--primary);">${formatBRL(totalBankBalance)}</span>
+            <span class="stat-value" style="color:var(--primary);">${dashboardMoney(totalBankBalance)}</span>
             <span class="stat-label">${accounts.length} contas cadastradas</span>
           </div>
         </div>
@@ -119,11 +127,11 @@ const DashboardView = {
 
           <div class="card">
             <div class="card-title"><span>Ganhos Registrados</span><i class="fas fa-arrow-trend-up"></i></div>
-            <div class="stat"><span class="stat-value" style="color:var(--success);">${formatBRL(totalGains)}</span><span class="stat-label">${gains.length} lançamentos</span></div>
+            <div class="stat"><span class="stat-value" style="color:var(--success);">${dashboardMoney(totalGains)}</span><span class="stat-label">${gains.length} lançamentos</span></div>
           </div>
           <div class="stat">
             <span class="stat-value ${totalExpensesThisMonth > 0 ? 'up' : ''}">
-              ${formatBRL(totalExpensesThisMonth)}
+              ${dashboardMoney(totalExpensesThisMonth)}
             </span>
             <span class="stat-label">${thisMonth.length} lançamentos neste mês</span>
           </div>
@@ -135,7 +143,7 @@ const DashboardView = {
             <i class="fas fa-chart-pie"></i>
           </div>
           <div class="stat">
-            <span class="stat-value" style="color:var(--success);">${formatBRL(totalInvestments)}</span>
+            <span class="stat-value" style="color:var(--success);">${dashboardMoney(totalInvestments)}</span>
             <span class="stat-label">${investments.length} ativos em custódia</span>
           </div>
         </div>
@@ -187,7 +195,7 @@ const DashboardView = {
                     <td><strong>${escapeHtml(a.banco)}</strong></td>
                     <td>${escapeHtml(a.titular)}</td>
                     <td><span class="badge badge-default">${escapeHtml(a.tipo || 'Corrente')}</span></td>
-                    <td style="font-weight:700;color:var(--success);">${formatBRL(accountBalances[a.id])}</td>
+                    <td style="font-weight:700;color:var(--success);">${dashboardMoney(accountBalances[a.id])}</td>
                   </tr>
                 `).join('') || '<tr><td colspan="4" style="color:var(--text-muted);text-align:center;padding:24px;">Nenhuma conta encontrada.</td></tr>'}
               </tbody>
@@ -227,9 +235,9 @@ const DashboardView = {
                       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(s.descricao)}">
                         ${escapeHtml(s.descricao)}
                       </td>
-                      <td style="font-weight:600;">${formatBRL(s.valor)}</td>
-                      <td title="${linkedExpenses.length} lançamento(s)">${formatBRL(linkedExpenseTotal)}</td>
-                      <td style="font-weight:600;color:var(--success);">${formatBRL(linkedGainTotal)}</td>
+                      <td style="font-weight:600;">${dashboardMoney(s.valor)}</td>
+                      <td title="${linkedExpenses.length} lançamento(s)">${dashboardMoney(linkedExpenseTotal)}</td>
+                      <td style="font-weight:600;color:var(--success);">${dashboardMoney(linkedGainTotal)}</td>
                       <td><span class="badge badge-${badgeClass}">${labelStatus}</span></td>
                     </tr>
                   `;
@@ -246,6 +254,11 @@ const DashboardView = {
     const state = dashboardSortState[type];
     state.direction = state.column === column && state.direction === 'asc' ? 'desc' : 'asc';
     state.column = column;
+    await this.render(document.getElementById('main-content'));
+  },
+
+  async togglePrivacy() {
+    dashboardPrivacyMode = !dashboardPrivacyMode;
     await this.render(document.getElementById('main-content'));
   },
 
