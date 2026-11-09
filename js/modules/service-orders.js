@@ -37,10 +37,8 @@ const ServiceOrdersModule = (() => {
   }
 
   function removeExpenseRow(button) {
-    const container = document.getElementById('f-os-expenses');
     const row = button.closest('[data-os-expense-row]');
-    if (container?.querySelectorAll('[data-os-expense-row]').length > 1) row.remove();
-    else Toast.show('A OS precisa manter pelo menos um gasto.', 'error');
+    if (row) row.remove();
   }
 
   function getSortIcon() {
@@ -452,12 +450,7 @@ const ServiceOrdersModule = (() => {
       (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })
     ));
     const linkedExpenses = so ? allExpenses.filter(expense => expense.ordem_id === so.id) : [];
-    const initialExpenses = linkedExpenses.length
-      ? linkedExpenses
-      : [{
-        descricao: so ? `Custo de reparo - ${so.descricao}` : 'Gasto inicial da OS',
-        valor: so?.custo_reparo ?? 0
-      }];
+    const initialExpenses = linkedExpenses;
     const overlay = document.getElementById('modal-overlay');
 
     const defaultDate = so?.data_abertura || new Date().toISOString().slice(0, 10);
@@ -578,7 +571,7 @@ const ServiceOrdersModule = (() => {
         Toast.show('Preencha a descrição do serviço e informe um valor válido.', 'error');
         return;
       }
-      if (!expensesToSave.length || expensesToSave.some(expense => (
+      if (expensesToSave.some(expense => (
         !expense.descricao || !Number.isFinite(expense.valor) || expense.valor < 0
       ))) {
         Toast.show('Informe a descrição e um valor válido para cada gasto da OS.', 'error');

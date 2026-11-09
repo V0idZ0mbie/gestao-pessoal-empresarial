@@ -167,7 +167,7 @@ test('OS aceita vários gastos vinculados e só lança ganho quando marcada como
       return null;
     }
   });
-  let expenseRows = [createExpenseRow('', 'Peças', '75')];
+  let expenseRows = [];
   elements.set('f-os-expenses', {
     querySelectorAll() { return expenseRows; },
     insertAdjacentHTML(position, html) { this.insertedHtml = html; }
@@ -217,6 +217,12 @@ test('OS aceita vários gastos vinculados e só lança ganho quando marcada como
 
   await context.ServiceOrdersModule.openForm('order-1');
   assert.match(elements.get('modal-body').innerHTML, /Adicionar gasto/);
+  assert.doesNotMatch(elements.get('modal-body').innerHTML, /data-os-expense-row/);
+  await elements.get('modal-submit').onclick();
+  assert.equal(expenses.length, 0);
+
+  expenseRows = [createExpenseRow('', 'Peças', '75')];
+  await context.ServiceOrdersModule.openForm('order-1');
   context.ServiceOrdersModule.addExpenseRow();
   expenseRows.push(createExpenseRow('', 'Transporte', '25'));
   assert.match(elements.get('f-os-expenses').insertedHtml, /data-expense-description/);
