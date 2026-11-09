@@ -112,6 +112,36 @@ const ServiceOrdersModule = (() => {
     });
   }
 
+  function normalizeSearchText(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLocaleLowerCase('pt-BR')
+      .trim();
+  }
+
+  function filterByClientName(query) {
+    const normalizedQuery = normalizeSearchText(query);
+    const rows = Array.from(document.querySelectorAll('[data-service-order-row]'));
+    let visibleRows = 0;
+    rows.forEach(row => {
+      const matches = normalizeSearchText(row.dataset.clientName).includes(normalizedQuery);
+      row.style.display = matches ? '' : 'none';
+      if (matches) visibleRows++;
+    });
+
+    const emptyResult = document.getElementById('service-orders-no-results');
+    if (emptyResult) emptyResult.style.display = rows.length && !visibleRows ? '' : 'none';
+
+    const selectAll = document.getElementById('select-all-orders');
+    if (selectAll) {
+      const visibleInputs = rows
+        .filter(row => row.style.display !== 'none')
+        .map(row => row.querySelector('input[type="checkbox"]'));
+      selectAll.checked = visibleInputs.length > 0 && visibleInputs.every(input => selectedOrderIds.has(input.dataset.orderId));
+    }
+  }
+
   async function renderList(container) {
     const [items, clients, accounts, expenses] = await Promise.all([
       Storage.get(COLLECTION), Storage.get('clients'), Storage.get('accounts'), Storage.get('expenses')
@@ -150,6 +180,14 @@ const ServiceOrdersModule = (() => {
         </div>
       </div>
 
+      <div class="form-group" style="max-width:420px;margin-bottom:16px;">
+        <label for="service-order-client-search">Filtrar por cliente</label>
+        <div style="position:relative;">
+          <i class="fas fa-search" aria-hidden="true" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);"></i>
+          <input id="service-order-client-search" type="search" placeholder="Digite o nome do cliente" oninput="ServiceOrdersModule.filterByClientName(this.value)" style="padding-left:36px;">
+        </div>
+      </div>
+
       <div class="bulk-actions" aria-label="Alterações em massa">
         <strong><i class="fas fa-check-square"></i> ${selectedOrderIds.size || 'Nenhuma'} selecionada${selectedOrderIds.size === 1 ? '' : 's'}</strong>
         <label>
@@ -182,7 +220,7 @@ const ServiceOrdersModule = (() => {
           <thead>
             <tr>
               <th style="width:42px;text-align:center;">
-                <input type="checkbox" aria-label="Selecionar todas as ordens visíveis" onchange="ServiceOrdersModule.toggleAllSelection(this.checked)" ${items.length && selectedOrderIds.size === items.length ? 'checked' : ''}>
+                <input id="select-all-orders" type="checkbox" aria-label="Selecionar todas as ordens visíveis" onchange="ServiceOrdersModule.toggleAllSelection(this.checked)" ${items.length && selectedOrderIds.size === items.length ? 'checked' : ''}>
               </th>
               ${getSortableHeader('cliente', 'Cliente Vinculado')}
               ${getSortableHeader('descricao', 'Descrição do Serviço')}
@@ -204,9 +242,9 @@ const ServiceOrdersModule = (() => {
               const linkedExpenses = expensesByOrder[so.id] || [];
               const linkedExpenseTotal = linkedExpenses.reduce((sum, expense) => sum + (Number(expense.valor) || 0), 0);
               return `
-                <tr>
+                <tr data-service-order-row data-client-name="${escapeHtml(clientName)}">
                   <td style="text-align:center;">
-                    <input type="checkbox" aria-label="Selecionar orçamento de ${escapeHtml(clientName)}" onchange="ServiceOrdersModule.toggleSelection('${so.id}', this.checked)" ${selectedOrderIds.has(so.id) ? 'checked' : ''}>
+                    <input type="checkbox" data-order-id="${escapeHtml(so.id)}" aria-label="Selecionar orçamento de ${escapeHtml(clientName)}" onchange="ServiceOrdersModule.toggleSelection('${so.id}', this.checked)" ${selectedOrderIds.has(so.id) ? 'checked' : ''}>
                   </td>
                   <td style="font-weight:700;">
                     <i class="fas fa-briefcase" style="color:var(--primary);margin-right:8px;"></i>
@@ -240,6 +278,7 @@ const ServiceOrdersModule = (() => {
                 </tr>
               `;
             }).join('') || '<tr><td colspan="9" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhuma Ordem de Serviço cadastrada. Clique em "Nova Ordem de Serviço" para emitir uma.</td></tr>'}
+            <tr id="service-orders-no-results" style="display:none;"><td colspan="9" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhuma ordem encontrada para este cliente.</td></tr>
           </tbody>
         </table>
       </div>
@@ -259,9 +298,11 @@ const ServiceOrdersModule = (() => {
   }
 
   function toggleAllSelection(checked) {
-    document.querySelectorAll('input[aria-label^="Selecionar orçamento de"]').forEach(input => {
+    document.querySelectorAll('[data-service-order-row]').forEach(row => {
+      if (row.style.display === 'none') return;
+      const input = row.querySelector('input[type="checkbox"]');
+      const id = input.dataset.orderId;
       input.checked = checked;
-      const id = input.getAttribute('onchange').match(/'([^']+)'/)[1];
       if (checked) selectedOrderIds.add(id);
       else selectedOrderIds.delete(id);
     });
@@ -680,7 +721,7 @@ const ServiceOrdersModule = (() => {
   return {
     render: renderList, renderList, openForm, deleteItem, closeModal, sortBy,
     togglePaymentFields, toggleSelection, toggleAllSelection, generateQuotePdf, switchFormTab,
-    applyBulkStatus, applyBulkPayment, addExpenseRow, removeExpenseRow
+    applyBulkStatus, applyBulkPayment, addExpenseRow, removeExpenseRow, filterByClientName
   };
 })();
 

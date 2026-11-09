@@ -257,6 +257,42 @@ test('categoria Gastos de serviço aparece selecionável ao editar uma despesa',
   assert.match(elements.get('modal-body').innerHTML, /value="Gastos de serviço" selected>Gastos de serviço/);
 });
 
+test('filtro de OS pesquisa o cliente ignorando acentos e seleciona apenas resultados visíveis', () => {
+  const context = createContext();
+  const createRow = name => {
+    const checkbox = { dataset: { orderId: name }, checked: false };
+    return {
+      dataset: { clientName: name },
+      style: { display: '' },
+      querySelector: () => checkbox,
+      checkbox
+    };
+  };
+  const rows = [createRow('João da Silva'), createRow('Maria Costa')];
+  const noResults = { style: { display: 'none' } };
+  const selectAll = { checked: false };
+  context.document.querySelectorAll = selector => (
+    selector === '[data-service-order-row]' ? rows : []
+  );
+  context.document.getElementById = id => ({
+    'service-orders-no-results': noResults,
+    'select-all-orders': selectAll
+  })[id] || null;
+  load(context, 'js/modules/service-orders.js');
+
+  context.ServiceOrdersModule.filterByClientName('joao');
+  assert.equal(rows[0].style.display, '');
+  assert.equal(rows[1].style.display, 'none');
+  assert.equal(noResults.style.display, 'none');
+
+  context.ServiceOrdersModule.toggleAllSelection(true);
+  assert.equal(rows[0].checkbox.checked, true);
+  assert.equal(rows[1].checkbox.checked, false);
+
+  context.ServiceOrdersModule.filterByClientName('cliente inexistente');
+  assert.equal(noResults.style.display, '');
+});
+
 test('OS aceita vários gastos vinculados e só lança ganho quando marcada como paga', async () => {
   const context = createContext();
   const elements = new Map();
