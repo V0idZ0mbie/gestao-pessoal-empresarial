@@ -516,7 +516,9 @@ const ServiceOrdersModule = (() => {
         const savedOrder = so
           ? await Storage.update(COLLECTION, so.id, payload)
           : await Storage.add(COLLECTION, payload);
-        await syncServiceOrderFinancials(savedOrder);
+        const financialOrder = savedOrder || (so ? { ...so, ...payload } : null);
+        if (!financialOrder) throw new Error('Não foi possível recuperar a ordem de serviço salva.');
+        await syncServiceOrderFinancials(financialOrder);
 
         if (so) {
           Toast.show('Ordem de serviço atualizada com sucesso!', 'success');

@@ -142,6 +142,65 @@ test('lançamentos de ganhos e gastos podem ser vinculados à mesma conta e orde
   assert.equal((await context.Storage.get('expenses')).length, 1);
 });
 
+test('custo de reparo da OS é lançado em gastos mesmo quando a atualização não retorna o registro', async () => {
+  const context = createContext();
+  const elements = new Map();
+  for (const id of ['modal-title', 'modal-body', 'modal-submit']) {
+    elements.set(id, {});
+  }
+  elements.set('modal-overlay', { classList: { add() {}, remove() {} } });
+  elements.set('f-cliente', { value: 'client-1' });
+  elements.set('f-descricao', { value: 'Reparo de equipamento' });
+  elements.set('f-valor', { value: '300' });
+  elements.set('f-custo-reparo', { value: '75' });
+  elements.set('f-data', { value: '2026-11-08' });
+  elements.set('f-status', { value: 'em_andamento' });
+  elements.set('f-obs', { value: '' });
+  elements.set('f-pago', { checked: false });
+  context.document.getElementById = id => elements.get(id) || null;
+  context.HashChangeEvent = function () {};
+  context.Toast = { show() {} };
+
+  const order = {
+    id: 'order-1',
+    clienteId: 'client-1',
+    descricao: 'Reparo de equipamento',
+    valor: 300,
+    custo_reparo: 0,
+    data_abertura: '2026-11-08',
+    status: 'aberta',
+    obs: '',
+    pago: false
+  };
+  const expenses = [];
+  context.Storage = {
+    async get(collection) {
+      if (collection === 'service_orders') return [order];
+      if (collection === 'clients') return [{ id: 'client-1', nome: 'Cliente' }];
+      if (collection === 'accounts' || collection === 'gains') return [];
+      if (collection === 'expenses') return expenses;
+      return [];
+    },
+    async update() {
+      return null;
+    },
+    async add(collection, item) {
+      const saved = { id: `${collection}-${expenses.length + 1}`, ...item };
+      if (collection === 'expenses') expenses.push(saved);
+      return saved;
+    }
+  };
+  load(context, 'js/modules/service-orders.js');
+
+  await context.ServiceOrdersModule.openForm('order-1');
+  await elements.get('modal-submit').onclick();
+
+  assert.equal(expenses.length, 1);
+  assert.equal(expenses[0].valor, 75);
+  assert.equal(expenses[0].ordem_id, 'order-1');
+  assert.equal(expenses[0].origem, 'service_order_repair_cost');
+});
+
 test('autenticação offline registra, autentica e encerra sessão', async () => {
   const context = createContext();
   load(context, 'js/auth.js');
