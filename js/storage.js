@@ -3,6 +3,10 @@
 // Se não houver conexão ou for modo offline/demo, usa localStorage isolado por usuário.
 
 const Storage = {
+  CACHE_TTL_MS: 5 * 60 * 1000,
+  _memoryCache: new Map(),
+  _inFlightGets: new Map(),
+
   _isCloudEnabled(userId) {
     return Boolean(window.supabaseConfigured && window.supabase?.from && !userId.startsWith('local-'));
   },
@@ -24,19 +28,66 @@ const Storage = {
   },
 
   async _getCurrentUserId() {
+    const storedUserId = sessionStorage.getItem('gp_userId');
+    if (storedUserId) return storedUserId;
+
     if (window.supabase && window.supabase.auth) {
       try {
-        const { data } = await window.supabase.auth.getUser();
-        if (data?.user?.id) return data.user.id;
+        const { data } = await window.supabase.auth.getSession();
+        if (data?.session?.user?.id) return data.session.user.id;
       } catch (e) {
         // Fallback silencioso
       }
     }
-    return sessionStorage.getItem('gp_userId') || 'local-guest-user';
+    return 'local-guest-user';
   },
 
   _getLocalKey(collection, userId) {
     return `gp_${userId}_${collection}`;
+  },
+
+  _getCacheKey(collection, userId) {
+    return `gp_cache_${userId}_${collection}`;
+  },
+
+  _readCache(collection, userId) {
+    const key = this._getCacheKey(collection, userId);
+    const memoryEntry = this._memoryCache.get(key);
+    if (memoryEntry) return memoryEntry;
+    try {
+      const saved = sessionStorage.getItem(key);
+      if (!saved) return null;
+      const entry = JSON.parse(saved);
+      if (!Array.isArray(entry.items) || !Number.isFinite(entry.cachedAt)) {
+        sessionStorage.removeItem(key);
+        return null;
+      }
+      this._memoryCache.set(key, entry);
+      return entry;
+    } catch (error) {
+      console.warn(`[Storage] Cache inválido para ${collection}:`, error.message);
+      return null;
+    }
+  },
+
+  _saveCache(collection, userId, items, cachedAt = Date.now()) {
+    const key = this._getCacheKey(collection, userId);
+    const entry = { cachedAt, items };
+    this._memoryCache.set(key, entry);
+    try {
+      sessionStorage.setItem(key, JSON.stringify(entry));
+    } catch (error) {
+      console.warn(`[Storage] Não foi possível armazenar o cache de ${collection}:`, error.message);
+    }
+  },
+
+  _updateCache(collection, userId, updateItems) {
+    const cached = this._readCache(collection, userId);
+    if (cached) this._saveCache(collection, userId, updateItems(cached.items), cached.cachedAt);
+  },
+
+  _copyItems(items) {
+    return items.map(item => ({ ...item }));
   },
 
   _getFromLocalStorage(collection, userId) {
@@ -59,20 +110,41 @@ const Storage = {
   // Lista todos os itens da coleção
   async get(collection) {
     const userId = await this._getCurrentUserId();
-
-    // Se temos cliente supabase ativo com sessão válida
-    if (this._isCloudEnabled(userId)) {
-      try {
-        const { data, error } = await window.supabase
-          .from(collection)
-          .select('*')
-          .eq('user_id', userId);
-        if (!error && data) return data.map(item => this._fromDatabaseItem(collection, item));
-      } catch (err) {
-        console.warn(`[Storage] Supabase get falhou para ${collection}, usando dados locais:`, err.message);
-      }
+    const cached = this._readCache(collection, userId);
+    if (cached && Date.now() - cached.cachedAt < this.CACHE_TTL_MS) {
+      return this._copyItems(cached.items);
     }
 
+    if (this._isCloudEnabled(userId)) {
+      const requestKey = this._getCacheKey(collection, userId);
+      let request = this._inFlightGets.get(requestKey);
+      if (!request) {
+        request = (async () => {
+          try {
+            const { data, error } = await window.supabase
+              .from(collection)
+              .select('*')
+              .eq('user_id', userId);
+            if (error) throw error;
+            if (data) {
+              const items = data.map(item => this._fromDatabaseItem(collection, item));
+              this._saveCache(collection, userId, items);
+              return items;
+            }
+          } catch (err) {
+            console.warn(`[Storage] Supabase get falhou para ${collection}:`, err.message);
+          } finally {
+            this._inFlightGets.delete(requestKey);
+          }
+          return null;
+        })();
+        this._inFlightGets.set(requestKey, request);
+      }
+      const cloudItems = await request;
+      if (cloudItems) return this._copyItems(cloudItems);
+    }
+
+    if (cached) return this._copyItems(cached.items);
     const localItems = this._getFromLocalStorage(collection, userId);
     return localItems;
   },
@@ -99,6 +171,7 @@ const Storage = {
           .single();
         if (!error && data) {
           const normalizedData = this._fromDatabaseItem(collection, data);
+          this._updateCache(collection, userId, items => [...items.filter(existing => existing.id !== normalizedData.id), normalizedData]);
           // Atualiza também o cache local
           const localItems = this._getFromLocalStorage(collection, userId);
           localItems.push(normalizedData);
@@ -113,6 +186,7 @@ const Storage = {
     const items = this._getFromLocalStorage(collection, userId);
     items.push(newItem);
     this._saveToLocalStorage(collection, userId, items);
+    this._updateCache(collection, userId, cachedItems => [...cachedItems.filter(existing => existing.id !== newItem.id), newItem]);
     return newItem;
   },
 
@@ -132,6 +206,9 @@ const Storage = {
           .single();
         if (!error && data) {
           const normalizedData = this._fromDatabaseItem(collection, data);
+          this._updateCache(collection, userId, items => items.map(item => (
+            item.id === id ? normalizedData : item
+          )));
           const items = this._getFromLocalStorage(collection, userId);
           const idx = items.findIndex(i => i.id === id);
           if (idx !== -1) items[idx] = normalizedData;
@@ -148,6 +225,9 @@ const Storage = {
     if (idx !== -1) {
       items[idx] = { ...items[idx], ...patch, updated_at: now };
       this._saveToLocalStorage(collection, userId, items);
+      this._updateCache(collection, userId, cachedItems => cachedItems.map(item => (
+        item.id === id ? { ...item, ...patch, updated_at: now } : item
+      )));
       return items[idx];
     }
     return null;
@@ -172,6 +252,7 @@ const Storage = {
     const items = this._getFromLocalStorage(collection, userId);
     const filtered = items.filter(i => i.id !== id);
     this._saveToLocalStorage(collection, userId, filtered);
+    this._updateCache(collection, userId, cachedItems => cachedItems.filter(item => item.id !== id));
     return true;
   },
 

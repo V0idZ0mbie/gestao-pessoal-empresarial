@@ -124,6 +124,46 @@ test('Storage converte clienteId para cliente_id no Supabase e normaliza a respo
   assert.equal(item.clienteId, 'client-1');
 });
 
+test('Storage reutiliza o cache de sessão para navegação e separa os dados por usuário', async () => {
+  const context = createContext();
+  context.supabaseConfigured = true;
+  context.sessionStorage.setItem('gp_userId', 'user-a');
+  const fetches = new Map();
+  context.supabase = {
+    from(collection) {
+      return {
+        select() {
+          return {
+            async eq(column, userId) {
+              fetches.set(userId, (fetches.get(userId) || 0) + 1);
+              await new Promise(resolve => setTimeout(resolve, 5));
+              return { data: [{ id: `${userId}-${collection}`, nome: userId }], error: null };
+            }
+          };
+        }
+      };
+    }
+  };
+  load(context, 'js/storage.js');
+
+  const simultaneousReads = await Promise.all([
+    context.Storage.get('clients'),
+    context.Storage.get('clients')
+  ]);
+  assert.equal(fetches.get('user-a'), 1);
+  assert.equal(simultaneousReads[0][0].nome, 'user-a');
+  assert.equal(context.sessionStorage.getItem('gp_cache_user-a_clients') !== null, true);
+
+  const cachedRead = await context.Storage.get('clients');
+  assert.equal(fetches.get('user-a'), 1);
+  assert.equal(cachedRead[0].nome, 'user-a');
+
+  context.sessionStorage.setItem('gp_userId', 'user-b');
+  const otherUserRead = await context.Storage.get('clients');
+  assert.equal(fetches.get('user-b'), 1);
+  assert.equal(otherUserRead[0].nome, 'user-b');
+});
+
 test('lançamentos de ganhos e gastos podem ser vinculados à mesma conta e ordem', async () => {
   const context = createContext();
   context.sessionStorage.setItem('gp_userId', 'user-a');
