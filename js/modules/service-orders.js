@@ -337,7 +337,9 @@ const ServiceOrdersModule = (() => {
           descricao: expense.descricao,
           valor: expense.valor,
           data: expense.data || order.data_abertura || new Date().toISOString().slice(0, 10),
-          categoria: expense.categoria || 'Gasto de OS',
+          categoria: expense.categoria === 'Gasto de OS' || !expense.categoria
+            ? 'Gastos de serviço'
+            : expense.categoria,
           conta_id: expense.conta_id || null,
           ordem_id: order.id,
           origem: 'service_order_expense'

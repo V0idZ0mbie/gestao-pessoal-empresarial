@@ -3,6 +3,17 @@
 
 const ExpensesModule = (() => {
   const COLLECTION = 'expenses';
+  const CATEGORIES = [
+    'Alimentação',
+    'Transporte',
+    'Moradia / Escritório',
+    'Saúde & Bem-estar',
+    'Lazer & Viagens',
+    'Educação & Treinamentos',
+    'Impostos & Taxas',
+    'Gastos de serviço',
+    'Outros'
+  ];
   
   // Estado de ordenação global
   let sortState = {
@@ -130,6 +141,9 @@ const ExpensesModule = (() => {
     const primaryAccount = accounts.find(account => account.is_primary);
     const orders = await Storage.get('service_orders');
     const overlay = document.getElementById('modal-overlay');
+    const categories = item?.categoria && !CATEGORIES.includes(item.categoria)
+      ? [...CATEGORIES, item.categoria]
+      : CATEGORIES;
 
     const defaultDate = item?.data || new Date().toISOString().slice(0, 10);
     const selectedAccountId = item ? (item.conta_id || '') : (primaryAccount?.id || '');
@@ -151,14 +165,7 @@ const ExpensesModule = (() => {
           <div class="form-group">
             <label>Categoria Financeira</label>
             <select id="f-categoria">
-              <option value="Alimentação" ${item?.categoria === 'Alimentação' ? 'selected' : ''}>Alimentação</option>
-              <option value="Transporte" ${item?.categoria === 'Transporte' ? 'selected' : ''}>Transporte</option>
-              <option value="Moradia / Escritório" ${item?.categoria === 'Moradia / Escritório' ? 'selected' : ''}>Moradia / Escritório</option>
-              <option value="Saúde & Bem-estar" ${item?.categoria === 'Saúde & Bem-estar' ? 'selected' : ''}>Saúde & Bem-estar</option>
-              <option value="Lazer & Viagens" ${item?.categoria === 'Lazer & Viagens' ? 'selected' : ''}>Lazer & Viagens</option>
-              <option value="Educação & Treinamentos" ${item?.categoria === 'Educação & Treinamentos' ? 'selected' : ''}>Educação & Treinamentos</option>
-              <option value="Impostos & Taxas" ${item?.categoria === 'Impostos & Taxas' ? 'selected' : ''}>Impostos & Taxas</option>
-              <option value="Outros" ${item?.categoria === 'Outros' ? 'selected' : ''}>Outros</option>
+              ${categories.map(category => `<option value="${escapeHtml(category)}" ${item?.categoria === category ? 'selected' : ''}>${escapeHtml(category)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">

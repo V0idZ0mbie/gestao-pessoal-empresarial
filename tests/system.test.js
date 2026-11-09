@@ -232,6 +232,31 @@ test('conta principal pode ser definida e é sugerida em ganhos e gastos', async
   assert.match(elements.get('modal-body').innerHTML, /value="account-main"/);
 });
 
+test('categoria Gastos de serviço aparece selecionável ao editar uma despesa', async () => {
+  const context = createContext();
+  const elements = new Map([
+    ['modal-title', {}],
+    ['modal-body', { innerHTML: '' }],
+    ['modal-submit', {}],
+    ['modal-overlay', { classList: { add() {}, remove() {} } }]
+  ]);
+  context.document.getElementById = id => elements.get(id) || null;
+  context.escapeHtml = value => String(value || '');
+  context.formatBRL = value => String(value);
+  context.Storage = {
+    async get(collection) {
+      if (collection === 'expenses') {
+        return [{ id: 'expense-1', descricao: 'Material', valor: 25, categoria: 'Gastos de serviço' }];
+      }
+      return [];
+    }
+  };
+
+  load(context, 'js/modules/expenses.js');
+  await context.ExpensesModule.openForm('expense-1');
+  assert.match(elements.get('modal-body').innerHTML, /value="Gastos de serviço" selected>Gastos de serviço/);
+});
+
 test('OS aceita vários gastos vinculados e só lança ganho quando marcada como paga', async () => {
   const context = createContext();
   const elements = new Map();
@@ -330,6 +355,7 @@ test('OS aceita vários gastos vinculados e só lança ganho quando marcada como
   assert.deepEqual(expenses.map(expense => expense.valor), [75, 25]);
   assert.ok(expenses.every(expense => expense.ordem_id === 'order-1'));
   assert.ok(expenses.every(expense => expense.origem === 'service_order_expense'));
+  assert.ok(expenses.every(expense => expense.categoria === 'Gastos de serviço'));
   assert.equal(gains.length, 0);
 
   expenseRows = expenses.map(expense => createExpenseRow(expense.id, expense.descricao, String(expense.valor)));
