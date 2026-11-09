@@ -10,6 +10,38 @@ const ServiceOrdersModule = (() => {
     direction: 'asc' // 'asc' or 'desc'
   };
   const selectedOrderIds = new Set();
+  let expenseRowSequence = 0;
+
+  function renderExpenseRow(expense = {}) {
+    const rowId = `os-expense-${expenseRowSequence++}`;
+    return `
+      <div class="os-expense-row" data-os-expense-row data-expense-id="${escapeHtml(expense.id || '')}" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(120px,1fr) auto;gap:8px;align-items:end;margin-bottom:10px;">
+        <div class="form-group" style="margin:0;">
+          <label for="${rowId}-description">Descrição do gasto *</label>
+          <input id="${rowId}-description" data-expense-description type="text" value="${escapeHtml(expense.descricao || '')}" placeholder="Ex: Peças, material, transporte">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="${rowId}-value">Valor (R$) *</label>
+          <input id="${rowId}-value" data-expense-value type="number" step="0.01" min="0" value="${expense.valor ?? ''}" placeholder="0,00">
+        </div>
+        <button type="button" class="btn btn-sm btn-danger" aria-label="Remover gasto" onclick="ServiceOrdersModule.removeExpenseRow(this)">
+          <i class="fas fa-trash-alt"></i>
+        </button>
+      </div>`;
+  }
+
+  function addExpenseRow(expense = {}) {
+    const container = document.getElementById('f-os-expenses');
+    if (!container) return;
+    container.insertAdjacentHTML('beforeend', renderExpenseRow(expense));
+  }
+
+  function removeExpenseRow(button) {
+    const container = document.getElementById('f-os-expenses');
+    const row = button.closest('[data-os-expense-row]');
+    if (container?.querySelectorAll('[data-os-expense-row]').length > 1) row.remove();
+    else Toast.show('A OS precisa manter pelo menos um gasto.', 'error');
+  }
 
   function getSortIcon() {
     const icons = {
@@ -260,16 +292,12 @@ const ServiceOrdersModule = (() => {
     }
   }
 
-  async function syncServiceOrderFinancials(order) {
+  async function syncServiceOrderFinancials(order, orderExpenses = null, existingExpenseIds = []) {
     const gains = await Storage.get('gains');
-    const expenses = await Storage.get('expenses');
     const orderGains = gains.filter(gain => gain.ordem_id === order.id && (
       gain.origem === 'service_order_revenue' || gain.origem === 'service_order_payment'
     ));
     const revenue = orderGains[0];
-    const orderRepairCosts = expenses.filter(expense => (
-      expense.ordem_id === order.id && expense.origem === 'service_order_repair_cost'
-    ));
     const revenuePayload = {
       descricao: `Pagamento da OS - ${order.descricao}`,
       valor: order.valor,
@@ -287,20 +315,27 @@ const ServiceOrdersModule = (() => {
       await Promise.all(orderGains.map(gain => Storage.remove('gains', gain.id)));
     }
 
-    const repairPayload = {
-      descricao: `Custo de reparo - ${order.descricao}`,
-      valor: Math.max(Number(order.custo_reparo) || 0, 0),
-      data: order.data_abertura || new Date().toISOString().slice(0, 10),
-      categoria: 'Custo de reparo de OS',
-      conta_id: null,
-      ordem_id: order.id,
-      origem: 'service_order_repair_cost'
-    };
-    if (orderRepairCosts.length) {
-      await Storage.update('expenses', orderRepairCosts[0].id, repairPayload);
-      await Promise.all(orderRepairCosts.slice(1).map(expense => Storage.remove('expenses', expense.id)));
-    } else {
-      await Storage.add('expenses', repairPayload);
+    if (orderExpenses) {
+      const expenses = await Storage.get('expenses');
+      const linkedExpenses = expenses.filter(expense => expense.ordem_id === order.id);
+      const desiredIds = new Set(orderExpenses.map(expense => expense.id).filter(Boolean));
+      const expenseIdsToRemove = new Set(existingExpenseIds);
+      for (const expense of orderExpenses) {
+        const expensePayload = {
+          descricao: expense.descricao,
+          valor: expense.valor,
+          data: expense.data || order.data_abertura || new Date().toISOString().slice(0, 10),
+          categoria: expense.categoria || 'Gasto de OS',
+          conta_id: expense.conta_id || null,
+          ordem_id: order.id,
+          origem: 'service_order_expense'
+        };
+        if (expense.id) await Storage.update('expenses', expense.id, expensePayload);
+        else await Storage.add('expenses', expensePayload);
+      }
+      await Promise.all(linkedExpenses
+        .filter(expense => expenseIdsToRemove.has(expense.id) && !desiredIds.has(expense.id))
+        .map(expense => Storage.remove('expenses', expense.id)));
     }
   }
 
@@ -410,11 +445,19 @@ const ServiceOrdersModule = (() => {
   async function openForm(id) {
     const items = await Storage.get(COLLECTION);
     const so = id ? items.find(s => s.id === id) : null;
-    const clients = await Storage.get('clients');
+    const [clients, accounts, allExpenses] = await Promise.all([
+      Storage.get('clients'), Storage.get('accounts'), Storage.get('expenses')
+    ]);
     const sortedClients = [...clients].sort((a, b) => (
       (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })
     ));
-    const accounts = await Storage.get('accounts');
+    const linkedExpenses = so ? allExpenses.filter(expense => expense.ordem_id === so.id) : [];
+    const initialExpenses = linkedExpenses.length
+      ? linkedExpenses
+      : [{
+        descricao: so ? `Custo de reparo - ${so.descricao}` : 'Gasto inicial da OS',
+        valor: so?.custo_reparo ?? 0
+      }];
     const overlay = document.getElementById('modal-overlay');
 
     const defaultDate = so?.data_abertura || new Date().toISOString().slice(0, 10);
@@ -488,10 +531,13 @@ const ServiceOrdersModule = (() => {
       </div>
       <div class="os-form-tab-panel" data-tab-panel="internal-control" role="tabpanel">
         <div class="form-group">
-          <label>Custo do reparo (R$)</label>
-          <input id="f-custo-reparo" type="number" step="0.01" min="0" placeholder="0,00" value="${so?.custo_reparo ?? ''}" />
-          <small class="form-help">Informe o valor gasto no reparo. Este dado é apenas para controle interno e não será exibido na impressão.</small>
+          <label>Gastos vinculados à OS</label>
+          <small class="form-help">Cada gasto será registrado separadamente e vinculado a esta ordem.</small>
         </div>
+        <div id="f-os-expenses">${initialExpenses.map(expense => renderExpenseRow(expense)).join('')}</div>
+        <button type="button" class="btn btn-sm btn-ghost" onclick="ServiceOrdersModule.addExpenseRow()">
+          <i class="fas fa-plus"></i> Adicionar gasto
+        </button>
       </div>
     `;
 
@@ -501,7 +547,22 @@ const ServiceOrdersModule = (() => {
       const clienteId = document.getElementById('f-cliente').value;
       const descricao = document.getElementById('f-descricao').value.trim();
       const valor = parseFloat(document.getElementById('f-valor').value) || 0;
-      const custoReparo = parseFloat(document.getElementById('f-custo-reparo').value) || 0;
+      const expensesContainer = document.getElementById('f-os-expenses');
+      const expensesToSave = Array.from(expensesContainer.querySelectorAll('[data-os-expense-row]'))
+        .map(row => {
+          const id = row.dataset.expenseId || '';
+          const existingExpense = linkedExpenses.find(expense => expense.id === id);
+          return {
+            id,
+            descricao: row.querySelector('[data-expense-description]').value.trim(),
+            rawValue: row.querySelector('[data-expense-value]').value,
+            categoria: existingExpense?.categoria,
+            conta_id: existingExpense?.conta_id,
+            data: existingExpense?.data
+          };
+        })
+        .filter(expense => expense.descricao || expense.rawValue !== '')
+        .map(expense => ({ ...expense, valor: Number(expense.rawValue) }));
       const data = document.getElementById('f-data').value || new Date().toISOString().slice(0, 10);
       const status = document.getElementById('f-status').value;
       const obs = document.getElementById('f-obs').value.trim();
@@ -517,13 +578,20 @@ const ServiceOrdersModule = (() => {
         Toast.show('Preencha a descrição do serviço e informe um valor válido.', 'error');
         return;
       }
+      if (!expensesToSave.length || expensesToSave.some(expense => (
+        !expense.descricao || !Number.isFinite(expense.valor) || expense.valor < 0
+      ))) {
+        Toast.show('Informe a descrição e um valor válido para cada gasto da OS.', 'error');
+        return;
+      }
       if (pago && (!formaPagamento || !contaPagamentoId)) {
         Toast.show('Informe a forma de pagamento e a conta que recebeu o valor.', 'error');
         return;
       }
 
+      const totalExpenses = expensesToSave.reduce((sum, expense) => sum + expense.valor, 0);
       const payload = {
-        clienteId, descricao, valor, custo_reparo: custoReparo, data_abertura: data, status, obs, pago,
+        clienteId, descricao, valor, custo_reparo: totalExpenses, data_abertura: data, status, obs, pago,
         forma_pagamento: formaPagamento, conta_pagamento_id: contaPagamentoId,
         data_pagamento: pago ? (so?.data_pagamento || new Date().toISOString().slice(0, 10)) : null
       };
@@ -534,7 +602,7 @@ const ServiceOrdersModule = (() => {
           : await Storage.add(COLLECTION, payload);
         const financialOrder = savedOrder || (so ? { ...so, ...payload } : null);
         if (!financialOrder) throw new Error('Não foi possível recuperar a ordem de serviço salva.');
-        await syncServiceOrderFinancials(financialOrder);
+        await syncServiceOrderFinancials(financialOrder, expensesToSave, linkedExpenses.map(expense => expense.id));
 
         if (so) {
           Toast.show('Ordem de serviço atualizada com sucesso!', 'success');
@@ -566,7 +634,7 @@ const ServiceOrdersModule = (() => {
         ))
         .map(gain => Storage.remove('gains', gain.id)));
       await Promise.all(expenses
-        .filter(expense => expense.ordem_id === id && expense.origem === 'service_order_repair_cost')
+        .filter(expense => expense.ordem_id === id)
         .map(expense => Storage.remove('expenses', expense.id)));
       Toast.show('Ordem de serviço excluída.', 'success');
       window.dispatchEvent(new HashChangeEvent('hashchange'));
@@ -594,7 +662,7 @@ const ServiceOrdersModule = (() => {
   return {
     render: renderList, renderList, openForm, deleteItem, closeModal, sortBy,
     togglePaymentFields, toggleSelection, toggleAllSelection, generateQuotePdf, switchFormTab,
-    applyBulkStatus, applyBulkPayment
+    applyBulkStatus, applyBulkPayment, addExpenseRow, removeExpenseRow
   };
 })();
 

@@ -142,23 +142,36 @@ test('lançamentos de ganhos e gastos podem ser vinculados à mesma conta e orde
   assert.equal((await context.Storage.get('expenses')).length, 1);
 });
 
-test('OS vincula gastos ao próprio ID e só lança ganho quando marcada como paga', async () => {
+test('OS aceita vários gastos vinculados e só lança ganho quando marcada como paga', async () => {
   const context = createContext();
   const elements = new Map();
   for (const id of ['modal-title', 'modal-body', 'modal-submit']) {
     elements.set(id, {});
   }
   elements.set('modal-overlay', { classList: { add() {}, remove() {} } });
+  elements.set('modal-body', { innerHTML: '' });
   elements.set('f-cliente', { value: 'client-1' });
   elements.set('f-descricao', { value: 'Reparo de equipamento' });
   elements.set('f-valor', { value: '300' });
-  elements.set('f-custo-reparo', { value: '0' });
   elements.set('f-data', { value: '2026-11-08' });
   elements.set('f-status', { value: 'em_andamento' });
   elements.set('f-obs', { value: '' });
   elements.set('f-pago', { checked: false });
   elements.set('f-forma-pagamento', { value: 'Pix' });
   elements.set('f-conta-pagamento', { value: 'account-1' });
+  const createExpenseRow = (id, description, value) => ({
+    dataset: { expenseId: id },
+    querySelector(selector) {
+      if (selector === '[data-expense-description]') return { value: description };
+      if (selector === '[data-expense-value]') return { value };
+      return null;
+    }
+  });
+  let expenseRows = [createExpenseRow('', 'Peças', '75')];
+  elements.set('f-os-expenses', {
+    querySelectorAll() { return expenseRows; },
+    insertAdjacentHTML(position, html) { this.insertedHtml = html; }
+  });
   context.document.getElementById = id => elements.get(id) || null;
   context.HashChangeEvent = function () {};
   context.Toast = { show() {} };
@@ -203,20 +216,23 @@ test('OS vincula gastos ao próprio ID e só lança ganho quando marcada como pa
   load(context, 'js/modules/service-orders.js');
 
   await context.ServiceOrdersModule.openForm('order-1');
+  assert.match(elements.get('modal-body').innerHTML, /Adicionar gasto/);
+  context.ServiceOrdersModule.addExpenseRow();
+  expenseRows.push(createExpenseRow('', 'Transporte', '25'));
+  assert.match(elements.get('f-os-expenses').insertedHtml, /data-expense-description/);
   await elements.get('modal-submit').onclick();
 
-  assert.equal(expenses.length, 1);
-  assert.equal(expenses[0].valor, 0);
-  assert.equal(expenses[0].ordem_id, 'order-1');
-  assert.equal(expenses[0].origem, 'service_order_repair_cost');
+  assert.equal(expenses.length, 2);
+  assert.deepEqual(expenses.map(expense => expense.valor), [75, 25]);
+  assert.ok(expenses.every(expense => expense.ordem_id === 'order-1'));
+  assert.ok(expenses.every(expense => expense.origem === 'service_order_expense'));
   assert.equal(gains.length, 0);
 
-  elements.get('f-custo-reparo').value = '75';
+  expenseRows = expenses.map(expense => createExpenseRow(expense.id, expense.descricao, String(expense.valor)));
   elements.get('f-pago').checked = true;
   await context.ServiceOrdersModule.openForm('order-1');
   await elements.get('modal-submit').onclick();
-  assert.equal(expenses.length, 1);
-  assert.equal(expenses[0].valor, 75);
+  assert.equal(expenses.length, 2);
   assert.equal(gains.length, 1);
   assert.equal(gains[0].ordem_id, 'order-1');
   assert.equal(gains[0].origem, 'service_order_payment');
@@ -224,6 +240,7 @@ test('OS vincula gastos ao próprio ID e só lança ganho quando marcada como pa
 
   await context.ServiceOrdersModule.openForm('order-1');
   await elements.get('modal-submit').onclick();
+  assert.equal(expenses.length, 2);
   assert.equal(gains.length, 1);
 });
 
