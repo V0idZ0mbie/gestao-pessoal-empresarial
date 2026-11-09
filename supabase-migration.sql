@@ -32,6 +32,16 @@ create table if not exists clients (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists categories (
+  id text primary key default gen_random_uuid()::text,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  tipo text not null check (tipo in ('expense', 'gain')),
+  nome text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, tipo, nome)
+);
+
 create table if not exists expenses (
   id text primary key default gen_random_uuid()::text,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -120,6 +130,7 @@ create table if not exists services_catalog (
 
 alter table accounts enable row level security;
 alter table clients enable row level security;
+alter table categories enable row level security;
 alter table expenses enable row level security;
 alter table gains enable row level security;
 alter table investments enable row level security;
@@ -132,6 +143,10 @@ create policy "Users can manage their own accounts" on accounts
 
 drop policy if exists "Users can manage their own clients" on clients;
 create policy "Users can manage their own clients" on clients
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their own categories" on categories;
+create policy "Users can manage their own categories" on categories
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 drop policy if exists "Users can manage their own expenses" on expenses;
@@ -170,6 +185,10 @@ for each row execute function update_updated_at();
 
 drop trigger if exists update_clients_updated_at on clients;
 create trigger update_clients_updated_at before update on clients
+for each row execute function update_updated_at();
+
+drop trigger if exists update_categories_updated_at on categories;
+create trigger update_categories_updated_at before update on categories
 for each row execute function update_updated_at();
 
 drop trigger if exists update_expenses_updated_at on expenses;

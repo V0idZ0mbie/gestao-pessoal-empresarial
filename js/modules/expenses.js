@@ -3,17 +3,6 @@
 
 const ExpensesModule = (() => {
   const COLLECTION = 'expenses';
-  const CATEGORIES = [
-    'Alimentação',
-    'Transporte',
-    'Moradia / Escritório',
-    'Saúde & Bem-estar',
-    'Lazer & Viagens',
-    'Educação & Treinamentos',
-    'Impostos & Taxas',
-    'Gastos de serviço',
-    'Outros'
-  ];
   
   // Estado de ordenação global
   let sortState = {
@@ -137,13 +126,16 @@ const ExpensesModule = (() => {
   async function openForm(id, ordemId = '') {
     const items = await Storage.get(COLLECTION);
     const item = id ? items.find(e => e.id === id) : null;
-    const accounts = await Storage.get('accounts');
-    const primaryAccount = accounts.find(account => account.is_primary);
-    const orders = await Storage.get('service_orders');
+    const [accounts, orders, configuredCategories] = await Promise.all([
+      Storage.get('accounts'),
+      Storage.get('service_orders'),
+      CategoriesModule.getCategories('expense')
+    ]);
     const overlay = document.getElementById('modal-overlay');
-    const categories = item?.categoria && !CATEGORIES.includes(item.categoria)
-      ? [...CATEGORIES, item.categoria]
-      : CATEGORIES;
+    const primaryAccount = accounts.find(account => account.is_primary);
+    const categories = item?.categoria && !configuredCategories.some(category => category.nome === item.categoria)
+      ? [...configuredCategories, { nome: item.categoria }]
+      : configuredCategories;
 
     const defaultDate = item?.data || new Date().toISOString().slice(0, 10);
     const selectedAccountId = item ? (item.conta_id || '') : (primaryAccount?.id || '');
@@ -165,7 +157,7 @@ const ExpensesModule = (() => {
           <div class="form-group">
             <label>Categoria Financeira</label>
             <select id="f-categoria">
-              ${categories.map(category => `<option value="${escapeHtml(category)}" ${item?.categoria === category ? 'selected' : ''}>${escapeHtml(category)}</option>`).join('')}
+              ${categories.map(category => `<option value="${escapeHtml(category.nome)}" ${item?.categoria === category.nome ? 'selected' : ''}>${escapeHtml(category.nome)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">

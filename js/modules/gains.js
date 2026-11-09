@@ -54,17 +54,23 @@ const GainsModule = (() => {
   }
 
   async function openForm(id, ordemId = '') {
-    const [items, accounts, orders] = await Promise.all([Storage.get(COLLECTION), Storage.get('accounts'), Storage.get('service_orders')]);
+    const [items, accounts, orders, configuredCategories] = await Promise.all([
+      Storage.get(COLLECTION), Storage.get('accounts'), Storage.get('service_orders'),
+      CategoriesModule.getCategories('gain')
+    ]);
     const item = id ? items.find(value => value.id === id) : null;
     const primaryAccount = accounts.find(account => account.is_primary);
     const selectedAccountId = item ? (item.conta_id || '') : (primaryAccount?.id || '');
+    const categories = item?.categoria && !configuredCategories.some(category => category.nome === item.categoria)
+      ? [...configuredCategories, { nome: item.categoria }]
+      : configuredCategories;
     const overlay = document.getElementById('modal-overlay');
     document.getElementById('modal-title').textContent = item ? 'Editar Ganho' : 'Novo Ganho / Receita';
     document.getElementById('modal-body').innerHTML = `
       <div class="form-group"><label>Descrição *</label><input id="f-ganho-descricao" value="${escapeHtml(item?.descricao || '')}" placeholder="Ex: Pagamento da ordem de serviço"></div>
       <div class="form-group"><label>Valor (R$) *</label><input id="f-ganho-valor" type="number" step="0.01" min="0" value="${item?.valor || ''}"></div>
       <div class="form-group"><label>Data</label><input id="f-ganho-data" type="date" value="${item?.data || new Date().toISOString().slice(0, 10)}"></div>
-      <div class="form-group"><label>Categoria</label><input id="f-ganho-categoria" value="${escapeHtml(item?.categoria || 'Serviços')}" placeholder="Ex: Serviços, salário, vendas"></div>
+      <div class="form-group"><label>Categoria</label><select id="f-ganho-categoria">${categories.map(category => `<option value="${escapeHtml(category.nome)}" ${(item?.categoria || 'Serviços') === category.nome ? 'selected' : ''}>${escapeHtml(category.nome)}</option>`).join('')}</select></div>
       <div class="form-group"><label>Conta de entrada</label><select id="f-ganho-conta"><option value="">Nenhuma</option>${accounts.map(account => `<option value="${account.id}" ${selectedAccountId === account.id ? 'selected' : ''}>${escapeHtml(account.banco)} - ${escapeHtml(account.titular)}${account.is_primary ? ' (Principal)' : ''}</option>`).join('')}</select></div>
       <div class="form-group"><label>Ordem de serviço (opcional)</label><select id="f-ganho-ordem"><option value="">Nenhuma</option>${orders.map(order => `<option value="${order.id}" ${(item?.ordem_id || ordemId) === order.id ? 'selected' : ''}>${escapeHtml(order.descricao || order.id)}</option>`).join('')}</select></div>`;
     document.getElementById('modal-submit').textContent = item ? 'Salvar Alterações' : 'Registrar Ganho';

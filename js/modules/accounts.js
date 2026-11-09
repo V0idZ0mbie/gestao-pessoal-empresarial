@@ -212,7 +212,10 @@ const AccountsModule = (() => {
   async function sortBy(column) {
     sortState.direction = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
     sortState.column = column;
-    await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
+    const container = document.getElementById('settings-content')
+      || document.getElementById('main-content').firstElementChild
+      || document.querySelector('.main');
+    await renderList(container);
   }
 
   return { render: renderList, renderList, openForm, deleteItem, closeModal, sortBy };

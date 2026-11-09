@@ -63,6 +63,8 @@ test('todos os scripts referenciados pelo HTML carregam sem exceção', () => {
 
   assert.ok(context.App);
   assert.ok(context.Storage);
+  assert.ok(context.CategoriesModule);
+  assert.ok(context.SettingsModule);
   assert.ok(context.AuthViews);
   assert.ok(context.DashboardView);
   assert.ok(context.AccountsModule);
@@ -200,6 +202,10 @@ test('conta principal pode ser definida e é sugerida em ganhos e gastos', async
   context.Storage = {
     async get(collection) {
       if (collection === 'accounts') return accounts;
+      if (collection === 'categories') return [
+        { id: 'expense-category', tipo: 'expense', nome: 'Outros' },
+        { id: 'gain-category', tipo: 'gain', nome: 'Serviços' }
+      ];
       return [];
     },
     async update(collection, id, patch) {
@@ -208,8 +214,10 @@ test('conta principal pode ser definida e é sugerida em ganhos e gastos', async
   };
   context.Toast = { show() {} };
   context.HashChangeEvent = function () {};
+  context.dispatchEvent = () => {};
 
   load(context, 'js/modules/accounts.js');
+  load(context, 'js/modules/categories.js');
   await context.AccountsModule.openForm('account-other');
   assert.match(elements.get('modal-body').innerHTML, /Usar como conta principal/);
   elements.set('f-banco', { value: 'Banco B' });
@@ -232,6 +240,54 @@ test('conta principal pode ser definida e é sugerida em ganhos e gastos', async
   assert.match(elements.get('modal-body').innerHTML, /value="account-main"/);
 });
 
+test('categorias configuráveis são exibidas e renomear atualiza lançamentos existentes', async () => {
+  const context = createContext();
+  const categories = [
+    { id: 'expense-1', tipo: 'expense', nome: 'Gastos gerais' },
+    { id: 'gain-1', tipo: 'gain', nome: 'Serviços' }
+  ];
+  const expenses = [{ id: 'entry-1', categoria: 'Gastos gerais' }];
+  const updates = [];
+  const elements = new Map([
+    ['modal-title', {}],
+    ['modal-body', { innerHTML: '' }],
+    ['modal-submit', {}],
+    ['modal-overlay', { classList: { add() {}, remove() {} } }]
+  ]);
+  context.document.getElementById = id => elements.get(id) || null;
+  context.escapeHtml = value => String(value || '');
+  context.App = { getRoute: () => 'settings/categories' };
+  context.Toast = { show() {} };
+  context.HashChangeEvent = function () {};
+  context.dispatchEvent = () => {};
+  context.Storage = {
+    async get(collection) {
+      if (collection === 'categories') return categories;
+      if (collection === 'expenses') return expenses;
+      return [];
+    },
+    async update(collection, id, patch) {
+      updates.push({ collection, id, patch });
+      const entries = collection === 'categories' ? categories : expenses;
+      Object.assign(entries.find(item => item.id === id), patch);
+    }
+  };
+  load(context, 'js/modules/categories.js');
+
+  const container = { innerHTML: '' };
+  await context.CategoriesModule.render(container);
+  assert.match(container.innerHTML, /Categorias de gastos e ganhos/);
+  assert.match(container.innerHTML, /Gastos gerais/);
+  assert.match(container.innerHTML, /Serviços/);
+
+  await context.CategoriesModule.rename('expense-1');
+  elements.set('f-category-name', { value: 'Materiais' });
+  await elements.get('modal-submit').onclick();
+  assert.equal(categories[0].nome, 'Materiais');
+  assert.deepEqual(updates.map(update => update.collection), ['categories', 'expenses']);
+  assert.equal(expenses[0].categoria, 'Materiais');
+});
+
 test('categoria Gastos de serviço aparece selecionável ao editar uma despesa', async () => {
   const context = createContext();
   const elements = new Map([
@@ -245,13 +301,19 @@ test('categoria Gastos de serviço aparece selecionável ao editar uma despesa',
   context.formatBRL = value => String(value);
   context.Storage = {
     async get(collection) {
+      if (collection === 'categories') return [
+        { id: 'category-service', tipo: 'expense', nome: 'Gastos de serviço' },
+        { id: 'category-gain', tipo: 'gain', nome: 'Serviços' }
+      ];
       if (collection === 'expenses') {
         return [{ id: 'expense-1', descricao: 'Material', valor: 25, categoria: 'Gastos de serviço' }];
       }
       return [];
-    }
+    },
+    async add() { throw new Error('Unexpected default category insertion'); }
   };
 
+  load(context, 'js/modules/categories.js');
   load(context, 'js/modules/expenses.js');
   await context.ExpensesModule.openForm('expense-1');
   assert.match(elements.get('modal-body').innerHTML, /value="Gastos de serviço" selected>Gastos de serviço/);
@@ -487,19 +549,22 @@ test('rotas protegidas e telas públicas permanecem registradas', () => {
     'js/views/dashboard.js',
     'js/views/auth.js',
     'js/modules/accounts.js',
+    'js/modules/categories.js',
     'js/modules/clients.js',
     'js/modules/expenses.js',
     'js/modules/gains.js',
     'js/modules/investments.js',
     'js/modules/service-orders.js',
     'js/modules/services-catalog.js',
+    'js/modules/settings.js',
     'js/app.js'
   ]) load(context, file);
 
   const routes = vm.runInContext('ROUTES', context);
   assert.deepEqual(Object.keys(routes).sort(), [
     'accounts', 'cadastros', 'clients', 'dashboard', 'expenses', 'gains',
-    'investments', 'login', 'register', 'service-orders', 'services'
+    'investments', 'login', 'register', 'service-orders', 'services',
+    'settings', 'settings/accounts', 'settings/categories'
   ].sort());
   assert.equal(routes.login.needsAuth, false);
   assert.equal(routes.dashboard.needsAuth, true);

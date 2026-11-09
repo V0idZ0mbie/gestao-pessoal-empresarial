@@ -3,7 +3,10 @@
 
 const ROUTES = {
   dashboard: { view: DashboardView, title: 'Painel de Controle', icon: 'fa-chart-line', needsAuth: true },
-  accounts: { view: AccountsModule, title: 'Contas Bancárias', icon: 'fa-university', needsAuth: true },
+  accounts: { view: SettingsModule, title: 'Configurações', icon: 'fa-cog', needsAuth: true },
+  settings: { view: SettingsModule, title: 'Configurações', icon: 'fa-cog', needsAuth: true },
+  'settings/accounts': { view: SettingsModule, title: 'Configurações', icon: 'fa-cog', needsAuth: true },
+  'settings/categories': { view: SettingsModule, title: 'Configurações', icon: 'fa-cog', needsAuth: true },
   clients: { view: ClientsModule, title: 'Cadastro de Clientes', icon: 'fa-users', needsAuth: true },
   expenses: { view: ExpensesModule, title: 'Controle de Gastos', icon: 'fa-receipt', needsAuth: true },
   gains: { view: GainsModule, title: 'Controle de Ganhos', icon: 'fa-arrow-trend-up', needsAuth: true },
@@ -114,7 +117,9 @@ const App = {
   updateNav(activeRoute) {
     document.querySelectorAll('.nav-link').forEach(link => {
       const route = link.getAttribute('href').replace(/^#\/?/, '');
-      link.classList.toggle('active', route === activeRoute);
+      link.classList.toggle('active', route === activeRoute || (
+        route === 'settings' && ['accounts', 'settings/accounts', 'settings/categories'].includes(activeRoute)
+      ));
     });
   },
 
