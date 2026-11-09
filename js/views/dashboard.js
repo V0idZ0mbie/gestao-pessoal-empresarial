@@ -65,6 +65,16 @@ const DashboardView = {
       return [account.id, (Number(account.saldo) || 0) + incoming - outgoing];
     }));
     const totalBankBalance = Object.values(accountBalances).reduce((sum, value) => sum + value, 0);
+    const expensesByOrder = expenses.reduce((result, expense) => {
+      if (!expense.ordem_id) return result;
+      (result[expense.ordem_id] ||= []).push(expense);
+      return result;
+    }, {});
+    const gainsByOrder = gains.reduce((result, gain) => {
+      if (!gain.ordem_id) return result;
+      (result[gain.ordem_id] ||= []).push(gain);
+      return result;
+    }, {});
 
     // Mapeamento de clientes para as ordens de serviço
     const clients = await Storage.get('clients');
@@ -197,6 +207,8 @@ const DashboardView = {
                   ${dashboardSortHeader('orders', 'cliente', 'Cliente')}
                   ${dashboardSortHeader('orders', 'descricao', 'Descrição')}
                   ${dashboardSortHeader('orders', 'valor', 'Valor')}
+                  <th>Gastos vinculados</th>
+                  <th>Recebido</th>
                   ${dashboardSortHeader('orders', 'status', 'Status')}
                 </tr>
               </thead>
@@ -205,6 +217,10 @@ const DashboardView = {
                   const clientName = clientMap[s.clienteId] || 'Cliente Avulso';
                   const badgeClass = s.status === 'concluida' ? 'success' : (s.status === 'em_andamento' ? 'warning' : 'info');
                   const labelStatus = s.status === 'concluida' ? 'Concluída' : (s.status === 'em_andamento' ? 'Em Andamento' : 'Aberta');
+                  const linkedExpenses = expensesByOrder[s.id] || [];
+                  const linkedGains = gainsByOrder[s.id] || [];
+                  const linkedExpenseTotal = linkedExpenses.reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
+                  const linkedGainTotal = linkedGains.reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
                   return `
                     <tr>
                       <td style="font-weight:600;">${escapeHtml(clientName)}</td>
@@ -212,10 +228,12 @@ const DashboardView = {
                         ${escapeHtml(s.descricao)}
                       </td>
                       <td style="font-weight:600;">${formatBRL(s.valor)}</td>
+                      <td title="${linkedExpenses.length} lançamento(s)">${formatBRL(linkedExpenseTotal)}</td>
+                      <td style="font-weight:600;color:var(--success);">${formatBRL(linkedGainTotal)}</td>
                       <td><span class="badge badge-${badgeClass}">${labelStatus}</span></td>
                     </tr>
                   `;
-                }).join('') || '<tr><td colspan="4" style="color:var(--text-muted);text-align:center;padding:24px;">Nenhuma ordem registrada.</td></tr>'}
+                }).join('') || '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:24px;">Nenhuma ordem registrada.</td></tr>'}
               </tbody>
             </table>
           </div>

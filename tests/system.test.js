@@ -142,7 +142,7 @@ test('lançamentos de ganhos e gastos podem ser vinculados à mesma conta e orde
   assert.equal((await context.Storage.get('expenses')).length, 1);
 });
 
-test('custo de reparo da OS é lançado em gastos mesmo quando a atualização não retorna o registro', async () => {
+test('OS vincula gastos ao próprio ID e só lança ganho quando marcada como paga', async () => {
   const context = createContext();
   const elements = new Map();
   for (const id of ['modal-title', 'modal-body', 'modal-submit']) {
@@ -152,11 +152,13 @@ test('custo de reparo da OS é lançado em gastos mesmo quando a atualização n
   elements.set('f-cliente', { value: 'client-1' });
   elements.set('f-descricao', { value: 'Reparo de equipamento' });
   elements.set('f-valor', { value: '300' });
-  elements.set('f-custo-reparo', { value: '75' });
+  elements.set('f-custo-reparo', { value: '0' });
   elements.set('f-data', { value: '2026-11-08' });
   elements.set('f-status', { value: 'em_andamento' });
   elements.set('f-obs', { value: '' });
   elements.set('f-pago', { checked: false });
+  elements.set('f-forma-pagamento', { value: 'Pix' });
+  elements.set('f-conta-pagamento', { value: 'account-1' });
   context.document.getElementById = id => elements.get(id) || null;
   context.HashChangeEvent = function () {};
   context.Toast = { show() {} };
@@ -173,20 +175,28 @@ test('custo de reparo da OS é lançado em gastos mesmo quando a atualização n
     pago: false
   };
   const expenses = [];
+  const gains = [];
   context.Storage = {
     async get(collection) {
       if (collection === 'service_orders') return [order];
       if (collection === 'clients') return [{ id: 'client-1', nome: 'Cliente' }];
-      if (collection === 'accounts' || collection === 'gains') return [];
+      if (collection === 'accounts') return [{ id: 'account-1', banco: 'Banco', titular: 'Conta' }];
+      if (collection === 'gains') return gains;
       if (collection === 'expenses') return expenses;
       return [];
     },
-    async update() {
+    async update(collection, id, patch) {
+      if (collection === 'service_orders') Object.assign(order, patch);
+      const entries = collection === 'expenses' ? expenses : collection === 'gains' ? gains : [];
+      const entry = entries.find(item => item.id === id);
+      if (entry) Object.assign(entry, patch);
       return null;
     },
     async add(collection, item) {
-      const saved = { id: `${collection}-${expenses.length + 1}`, ...item };
+      const entries = collection === 'expenses' ? expenses : gains;
+      const saved = { id: `${collection}-${entries.length + 1}`, ...item };
       if (collection === 'expenses') expenses.push(saved);
+      if (collection === 'gains') gains.push(saved);
       return saved;
     }
   };
@@ -196,9 +206,55 @@ test('custo de reparo da OS é lançado em gastos mesmo quando a atualização n
   await elements.get('modal-submit').onclick();
 
   assert.equal(expenses.length, 1);
-  assert.equal(expenses[0].valor, 75);
+  assert.equal(expenses[0].valor, 0);
   assert.equal(expenses[0].ordem_id, 'order-1');
   assert.equal(expenses[0].origem, 'service_order_repair_cost');
+  assert.equal(gains.length, 0);
+
+  elements.get('f-custo-reparo').value = '75';
+  elements.get('f-pago').checked = true;
+  await context.ServiceOrdersModule.openForm('order-1');
+  await elements.get('modal-submit').onclick();
+  assert.equal(expenses.length, 1);
+  assert.equal(expenses[0].valor, 75);
+  assert.equal(gains.length, 1);
+  assert.equal(gains[0].ordem_id, 'order-1');
+  assert.equal(gains[0].origem, 'service_order_payment');
+  assert.equal(gains[0].conta_id, 'account-1');
+
+  await context.ServiceOrdersModule.openForm('order-1');
+  await elements.get('modal-submit').onclick();
+  assert.equal(gains.length, 1);
+});
+
+test('dashboard exibe os gastos e ganhos vinculados a cada OS', async () => {
+  const context = createContext();
+  const data = {
+    accounts: [],
+    expenses: [{ id: 'expense-1', ordem_id: 'order-1', valor: 75 }],
+    gains: [{ id: 'gain-1', ordem_id: 'order-1', valor: 300 }],
+    investments: [],
+    service_orders: [{
+      id: 'order-1',
+      clienteId: 'client-1',
+      descricao: 'Reparo de equipamento',
+      valor: 300,
+      status: 'concluida',
+      pago: true
+    }],
+    clients: [{ id: 'client-1', nome: 'Cliente' }]
+  };
+  context.Storage = { async get(collection) { return data[collection] || []; } };
+  load(context, 'js/views/dashboard.js');
+
+  const container = { innerHTML: '' };
+  await context.DashboardView.render(container);
+
+  assert.match(container.innerHTML, /Gastos vinculados/);
+  assert.match(container.innerHTML, /Recebido/);
+  assert.match(container.innerHTML, /Reparo de equipamento/);
+  assert.match(container.innerHTML, /75,00/);
+  assert.match(container.innerHTML, /300,00/);
 });
 
 test('autenticação offline registra, autentica e encerra sessão', async () => {

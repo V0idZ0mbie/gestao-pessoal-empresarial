@@ -71,11 +71,17 @@ const ServiceOrdersModule = (() => {
   }
 
   async function renderList(container) {
-    const items = await Storage.get(COLLECTION);
-    const [clients, accounts] = await Promise.all([Storage.get('clients'), Storage.get('accounts')]);
+    const [items, clients, accounts, expenses] = await Promise.all([
+      Storage.get(COLLECTION), Storage.get('clients'), Storage.get('accounts'), Storage.get('expenses')
+    ]);
     const clientMap = {};
     clients.forEach(c => { clientMap[c.id] = c.nome; });
     const accountMap = Object.fromEntries(accounts.map(account => [account.id, `${account.banco} - ${account.titular}`]));
+    const expensesByOrder = expenses.reduce((result, expense) => {
+      if (!expense.ordem_id) return result;
+      (result[expense.ordem_id] ||= []).push(expense);
+      return result;
+    }, {});
 
     const totalValor = items.reduce((acc, curr) => acc + (parseFloat(curr.valor) || 0), 0);
     const availableIds = new Set(items.map(item => item.id));
@@ -139,6 +145,7 @@ const ServiceOrdersModule = (() => {
               ${getSortableHeader('cliente', 'Cliente Vinculado')}
               ${getSortableHeader('descricao', 'Descrição do Serviço')}
               ${getSortableHeader('valor', 'Preço')}
+              <th>Gastos vinculados</th>
               ${getSortableHeader('data', 'Data de Abertura')}
               ${getSortableHeader('status', 'Status Atual')}
               <th>Pagamento</th>
@@ -152,6 +159,8 @@ const ServiceOrdersModule = (() => {
               const statusName = so.status === 'concluida' ? 'Concluída' : (so.status === 'em_andamento' ? 'Em Andamento' : 'Aberta');
               const paymentLabel = so.pago ? 'Pago' : 'Aguardando pagamento';
               const paymentClass = so.pago ? 'success' : 'warning';
+              const linkedExpenses = expensesByOrder[so.id] || [];
+              const linkedExpenseTotal = linkedExpenses.reduce((sum, expense) => sum + (Number(expense.valor) || 0), 0);
               return `
                 <tr>
                   <td style="text-align:center;">
@@ -165,6 +174,7 @@ const ServiceOrdersModule = (() => {
                     ${escapeHtml(so.descricao)}
                   </td>
                   <td style="font-weight:700;color:var(--success);">${formatBRL(so.valor)}</td>
+                  <td title="${linkedExpenses.length} lançamento(s)">${formatBRL(linkedExpenseTotal)}${linkedExpenses.length ? `<small style="display:block;color:var(--text-muted);">${linkedExpenses.length} lançamento(s)</small>` : ''}</td>
                   <td>${so.data_abertura ? new Date(so.data_abertura + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
                   <td><span class="badge badge-${badgeClass}">${statusName}</span></td>
                   <td>
@@ -187,7 +197,7 @@ const ServiceOrdersModule = (() => {
                   </td>
                 </tr>
               `;
-            }).join('') || '<tr><td colspan="8" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhuma Ordem de Serviço cadastrada. Clique em "Nova Ordem de Serviço" para emitir uma.</td></tr>'}
+            }).join('') || '<tr><td colspan="9" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhuma Ordem de Serviço cadastrada. Clique em "Nova Ordem de Serviço" para emitir uma.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -253,42 +263,44 @@ const ServiceOrdersModule = (() => {
   async function syncServiceOrderFinancials(order) {
     const gains = await Storage.get('gains');
     const expenses = await Storage.get('expenses');
-    const revenue = gains.find(gain => gain.ordem_id === order.id && (
+    const orderGains = gains.filter(gain => gain.ordem_id === order.id && (
       gain.origem === 'service_order_revenue' || gain.origem === 'service_order_payment'
     ));
-    const repairCost = expenses.find(expense => (
+    const revenue = orderGains[0];
+    const orderRepairCosts = expenses.filter(expense => (
       expense.ordem_id === order.id && expense.origem === 'service_order_repair_cost'
     ));
     const revenuePayload = {
-      descricao: `Valor cobrado - ${order.descricao}`,
+      descricao: `Pagamento da OS - ${order.descricao}`,
       valor: order.valor,
-      data: order.data_abertura || new Date().toISOString().slice(0, 10),
+      data: order.data_pagamento || new Date().toISOString().slice(0, 10),
       categoria: 'Receita de OS',
-      conta_id: order.pago ? order.conta_pagamento_id : null,
+      conta_id: order.conta_pagamento_id || null,
       ordem_id: order.id,
-      origem: 'service_order_revenue'
+      origem: 'service_order_payment'
     };
-    if (Number(order.valor) > 0) {
+    if (order.pago && Number(order.valor) > 0) {
       if (revenue) await Storage.update('gains', revenue.id, revenuePayload);
       else await Storage.add('gains', revenuePayload);
-    } else if (revenue) {
-      await Storage.remove('gains', revenue.id);
+      await Promise.all(orderGains.slice(1).map(gain => Storage.remove('gains', gain.id)));
+    } else {
+      await Promise.all(orderGains.map(gain => Storage.remove('gains', gain.id)));
     }
 
-    if (repairCost && Number(order.custo_reparo) <= 0) {
-      await Storage.remove('expenses', repairCost.id);
-    } else if (Number(order.custo_reparo) > 0) {
-      const repairPayload = {
-        descricao: `Custo de reparo - ${order.descricao}`,
-        valor: order.custo_reparo,
-        data: order.data_abertura || new Date().toISOString().slice(0, 10),
-        categoria: 'Custo de reparo de OS',
-        conta_id: null,
-        ordem_id: order.id,
-        origem: 'service_order_repair_cost'
-      };
-      if (repairCost) await Storage.update('expenses', repairCost.id, repairPayload);
-      else await Storage.add('expenses', repairPayload);
+    const repairPayload = {
+      descricao: `Custo de reparo - ${order.descricao}`,
+      valor: Math.max(Number(order.custo_reparo) || 0, 0),
+      data: order.data_abertura || new Date().toISOString().slice(0, 10),
+      categoria: 'Custo de reparo de OS',
+      conta_id: null,
+      ordem_id: order.id,
+      origem: 'service_order_repair_cost'
+    };
+    if (orderRepairCosts.length) {
+      await Storage.update('expenses', orderRepairCosts[0].id, repairPayload);
+      await Promise.all(orderRepairCosts.slice(1).map(expense => Storage.remove('expenses', expense.id)));
+    } else {
+      await Storage.add('expenses', repairPayload);
     }
   }
 
@@ -304,8 +316,12 @@ const ServiceOrdersModule = (() => {
       const selectedItems = items.filter(item => selectedOrderIds.has(item.id));
       const pago = paymentStatus === 'paid';
       for (const item of selectedItems) {
-        const updatedOrder = await Storage.update(COLLECTION, item.id, { pago });
-        await syncServiceOrderFinancials(updatedOrder || { ...item, pago });
+        const paymentPatch = {
+          pago,
+          data_pagamento: pago ? (item.data_pagamento || new Date().toISOString().slice(0, 10)) : null
+        };
+        const updatedOrder = await Storage.update(COLLECTION, item.id, paymentPatch);
+        await syncServiceOrderFinancials(updatedOrder || { ...item, ...paymentPatch });
       }
       const warning = pago && selectedItems.some(item => !item.forma_pagamento || !item.conta_pagamento_id)
         ? ' Os detalhes de forma e conta devem ser preenchidos na edição individual.'
