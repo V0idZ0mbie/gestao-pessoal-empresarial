@@ -11,9 +11,14 @@ create table if not exists accounts (
   titular text not null,
   tipo text,
   saldo numeric not null default 0,
+  is_primary boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table accounts add column if not exists is_primary boolean not null default false;
+create unique index if not exists accounts_one_primary_per_user_idx
+  on accounts (user_id) where is_primary;
 
 create table if not exists clients (
   id text primary key default gen_random_uuid()::text,

@@ -142,6 +142,56 @@ test('lançamentos de ganhos e gastos podem ser vinculados à mesma conta e orde
   assert.equal((await context.Storage.get('expenses')).length, 1);
 });
 
+test('conta principal pode ser definida e é sugerida em ganhos e gastos', async () => {
+  const context = createContext();
+  const accounts = [
+    { id: 'account-main', banco: 'Banco A', titular: 'Principal', is_primary: true },
+    { id: 'account-other', banco: 'Banco B', titular: 'Alternativa', is_primary: false }
+  ];
+  const elements = new Map([
+    ['modal-title', {}],
+    ['modal-body', { innerHTML: '' }],
+    ['modal-submit', {}],
+    ['modal-overlay', { classList: { add() {}, remove() {} } }]
+  ]);
+  context.document.getElementById = id => elements.get(id) || null;
+  context.escapeHtml = value => String(value || '');
+  context.formatBRL = value => String(value);
+  context.Storage = {
+    async get(collection) {
+      if (collection === 'accounts') return accounts;
+      return [];
+    },
+    async update(collection, id, patch) {
+      Object.assign(accounts.find(account => account.id === id), patch);
+    }
+  };
+  context.Toast = { show() {} };
+  context.HashChangeEvent = function () {};
+
+  load(context, 'js/modules/accounts.js');
+  await context.AccountsModule.openForm('account-other');
+  assert.match(elements.get('modal-body').innerHTML, /Usar como conta principal/);
+  elements.set('f-banco', { value: 'Banco B' });
+  elements.set('f-titular', { value: 'Alternativa' });
+  elements.set('f-tipo', { value: 'Conta Corrente' });
+  elements.set('f-saldo', { value: '0' });
+  elements.set('f-conta-principal', { checked: true });
+  await elements.get('modal-submit').onclick();
+  assert.equal(accounts[0].is_primary, false);
+  assert.equal(accounts[1].is_primary, true);
+
+  load(context, 'js/modules/gains.js');
+  await context.GainsModule.openForm();
+  assert.match(elements.get('modal-body').innerHTML, /value="account-other" selected/);
+  assert.match(elements.get('modal-body').innerHTML, /value="account-main"/);
+
+  load(context, 'js/modules/expenses.js');
+  await context.ExpensesModule.openForm();
+  assert.match(elements.get('modal-body').innerHTML, /value="account-other" selected/);
+  assert.match(elements.get('modal-body').innerHTML, /value="account-main"/);
+});
+
 test('OS aceita vários gastos vinculados e só lança ganho quando marcada como paga', async () => {
   const context = createContext();
   const elements = new Map();
@@ -164,6 +214,7 @@ test('OS aceita vários gastos vinculados e só lança ganho quando marcada como
     querySelector(selector) {
       if (selector === '[data-expense-description]') return { value: description };
       if (selector === '[data-expense-value]') return { value };
+      if (selector === '[data-expense-account]') return { value: 'account-1' };
       return null;
     }
   });
@@ -193,7 +244,10 @@ test('OS aceita vários gastos vinculados e só lança ganho quando marcada como
     async get(collection) {
       if (collection === 'service_orders') return [order];
       if (collection === 'clients') return [{ id: 'client-1', nome: 'Cliente' }];
-      if (collection === 'accounts') return [{ id: 'account-1', banco: 'Banco', titular: 'Conta' }];
+      if (collection === 'accounts') return [
+        { id: 'account-1', banco: 'Banco', titular: 'Conta', is_primary: true },
+        { id: 'account-2', banco: 'Outro Banco', titular: 'Alternativa', is_primary: false }
+      ];
       if (collection === 'gains') return gains;
       if (collection === 'expenses') return expenses;
       return [];
@@ -217,6 +271,8 @@ test('OS aceita vários gastos vinculados e só lança ganho quando marcada como
 
   await context.ServiceOrdersModule.openForm('order-1');
   assert.match(elements.get('modal-body').innerHTML, /Adicionar gasto/);
+  assert.match(elements.get('modal-body').innerHTML, /value="account-1" selected/);
+  assert.match(elements.get('modal-body').innerHTML, /value="account-2"/);
   assert.doesNotMatch(elements.get('modal-body').innerHTML, /data-os-expense-row/);
   await elements.get('modal-submit').onclick();
   assert.equal(expenses.length, 0);
@@ -226,6 +282,8 @@ test('OS aceita vários gastos vinculados e só lança ganho quando marcada como
   context.ServiceOrdersModule.addExpenseRow();
   expenseRows.push(createExpenseRow('', 'Transporte', '25'));
   assert.match(elements.get('f-os-expenses').insertedHtml, /data-expense-description/);
+  assert.match(elements.get('f-os-expenses').insertedHtml, /value="account-1" selected/);
+  assert.match(elements.get('f-os-expenses').insertedHtml, /value="account-2"/);
   await elements.get('modal-submit').onclick();
 
   assert.equal(expenses.length, 2);

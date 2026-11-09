@@ -127,10 +127,12 @@ const ExpensesModule = (() => {
     const items = await Storage.get(COLLECTION);
     const item = id ? items.find(e => e.id === id) : null;
     const accounts = await Storage.get('accounts');
+    const primaryAccount = accounts.find(account => account.is_primary);
     const orders = await Storage.get('service_orders');
     const overlay = document.getElementById('modal-overlay');
 
     const defaultDate = item?.data || new Date().toISOString().slice(0, 10);
+    const selectedAccountId = item ? (item.conta_id || '') : (primaryAccount?.id || '');
 
     document.getElementById('modal-title').textContent = item ? 'Editar Despesa' : 'Novo Lançamento de Gasto';
         document.getElementById('modal-body').innerHTML = `
@@ -163,7 +165,7 @@ const ExpensesModule = (() => {
             <label>Conta de Saída (opcional)</label>
             <select id="f-conta">
               <option value="">Nenhuma / Dinheiro físico</option>
-              ${accounts.map(a => `<option value="${a.id}" ${item?.conta_id === a.id ? 'selected' : ''}>${escapeHtml(a.banco)} - Saldo: ${formatBRL(a.saldo)}</option>`).join('')}
+              ${accounts.map(a => `<option value="${a.id}" ${selectedAccountId === a.id ? 'selected' : ''}>${escapeHtml(a.banco)} - ${escapeHtml(a.titular)}${a.is_primary ? ' (Principal)' : ''} - Saldo: ${formatBRL(a.saldo)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">

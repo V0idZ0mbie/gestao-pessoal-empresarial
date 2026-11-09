@@ -83,6 +83,7 @@ const AccountsModule = (() => {
               ${getSortableHeader('banco', 'Instituição / Banco')}
               ${getSortableHeader('titular', 'Titular')}
               ${getSortableHeader('tipo', 'Modalidade')}
+              <th>Conta principal</th>
               ${getSortableHeader('saldo_atual', 'Saldo Atual')}
               <th style="text-align:right;">Ações</th>
             </tr>
@@ -96,6 +97,7 @@ const AccountsModule = (() => {
                 </td>
                 <td>${escapeHtml(a.titular)}</td>
                 <td><span class="badge badge-default">${escapeHtml(a.tipo || 'Corrente')}</span></td>
+                <td>${a.is_primary ? '<span class="badge badge-success">Principal</span>' : '—'}</td>
                 <td style="font-weight:700;color:${(parseFloat(a.saldo) || 0) >= 0 ? 'var(--success)' : 'var(--danger)'};">
                   ${formatBRL(balances[a.id])}
                 </td>
@@ -108,7 +110,7 @@ const AccountsModule = (() => {
                   </button>
                 </td>
               </tr>
-            `).join('') || '<tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhuma conta cadastrada ainda. Clique em "Nova Conta" para começar.</td></tr>'}
+            `).join('') || '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:32px;">Nenhuma conta cadastrada ainda. Clique em "Nova Conta" para começar.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -143,6 +145,12 @@ const AccountsModule = (() => {
         <label>Saldo Inicial (R$) *</label>
         <input id="f-saldo" type="number" step="0.01" placeholder="0,00" value="${item ? item.saldo : ''}" />
       </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input id="f-conta-principal" type="checkbox" ${item?.is_primary ? 'checked' : ''} />
+          Usar como conta principal para novas movimentações
+        </label>
+      </div>
     `;
     
     document.getElementById('modal-submit').textContent = item ? 'Salvar Alterações' : 'Cadastrar Conta';
@@ -152,6 +160,7 @@ const AccountsModule = (() => {
       const titular = document.getElementById('f-titular').value.trim();
       const tipo = document.getElementById('f-tipo').value;
       const saldo = parseFloat(document.getElementById('f-saldo').value) || 0;
+      const isPrimary = document.getElementById('f-conta-principal').checked;
 
       if (!banco || !titular) {
         Toast.show('Preencha os campos obrigatórios (Banco e Titular).', 'error');
@@ -159,7 +168,12 @@ const AccountsModule = (() => {
       }
 
       try {
-        const payload = { banco, titular, tipo, saldo };
+        const payload = { banco, titular, tipo, saldo, is_primary: isPrimary };
+        if (isPrimary) {
+          await Promise.all(items
+            .filter(account => account.is_primary && account.id !== item?.id)
+            .map(account => Storage.update(COLLECTION, account.id, { is_primary: false })));
+        }
         if (item) {
           await Storage.update(COLLECTION, item.id, payload);
           Toast.show('Conta atualizada com sucesso!', 'success');

@@ -11,11 +11,13 @@ const ServiceOrdersModule = (() => {
   };
   const selectedOrderIds = new Set();
   let expenseRowSequence = 0;
+  let expenseFormAccounts = [];
+  let primaryAccountId = '';
 
   function renderExpenseRow(expense = {}) {
     const rowId = `os-expense-${expenseRowSequence++}`;
     return `
-      <div class="os-expense-row" data-os-expense-row data-expense-id="${escapeHtml(expense.id || '')}" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(120px,1fr) auto;gap:8px;align-items:end;margin-bottom:10px;">
+      <div class="os-expense-row" data-os-expense-row data-expense-id="${escapeHtml(expense.id || '')}" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(120px,1fr) minmax(150px,1fr) auto;gap:8px;align-items:end;margin-bottom:10px;">
         <div class="form-group" style="margin:0;">
           <label for="${rowId}-description">Descrição do gasto *</label>
           <input id="${rowId}-description" data-expense-description type="text" value="${escapeHtml(expense.descricao || '')}" placeholder="Ex: Peças, material, transporte">
@@ -23,6 +25,13 @@ const ServiceOrdersModule = (() => {
         <div class="form-group" style="margin:0;">
           <label for="${rowId}-value">Valor (R$) *</label>
           <input id="${rowId}-value" data-expense-value type="number" step="0.01" min="0" value="${expense.valor ?? ''}" placeholder="0,00">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="${rowId}-account">Conta de saída</label>
+          <select id="${rowId}-account" data-expense-account>
+            <option value="">Nenhuma</option>
+            ${expenseFormAccounts.map(account => `<option value="${account.id}" ${(expense.conta_id || primaryAccountId) === account.id ? 'selected' : ''}>${escapeHtml(account.banco)} - ${escapeHtml(account.titular)}${account.is_primary ? ' (Principal)' : ''}</option>`).join('')}
+          </select>
         </div>
         <button type="button" class="btn btn-sm btn-danger" aria-label="Remover gasto" onclick="ServiceOrdersModule.removeExpenseRow(this)">
           <i class="fas fa-trash-alt"></i>
@@ -33,7 +42,10 @@ const ServiceOrdersModule = (() => {
   function addExpenseRow(expense = {}) {
     const container = document.getElementById('f-os-expenses');
     if (!container) return;
-    container.insertAdjacentHTML('beforeend', renderExpenseRow(expense));
+    container.insertAdjacentHTML('beforeend', renderExpenseRow({
+      ...expense,
+      conta_id: expense.conta_id || primaryAccountId
+    }));
   }
 
   function removeExpenseRow(button) {
@@ -296,12 +308,14 @@ const ServiceOrdersModule = (() => {
       gain.origem === 'service_order_revenue' || gain.origem === 'service_order_payment'
     ));
     const revenue = orderGains[0];
+    const accounts = await Storage.get('accounts');
+    const primaryAccount = accounts.find(account => account.is_primary);
     const revenuePayload = {
       descricao: `Pagamento da OS - ${order.descricao}`,
       valor: order.valor,
       data: order.data_pagamento || new Date().toISOString().slice(0, 10),
       categoria: 'Receita de OS',
-      conta_id: order.conta_pagamento_id || null,
+      conta_id: order.conta_pagamento_id || primaryAccount?.id || null,
       ordem_id: order.id,
       origem: 'service_order_payment'
     };
@@ -346,19 +360,24 @@ const ServiceOrdersModule = (() => {
 
     try {
       const items = await Storage.get(COLLECTION);
+      const accounts = await Storage.get('accounts');
+      const primaryAccount = accounts.find(account => account.is_primary);
       const selectedItems = items.filter(item => selectedOrderIds.has(item.id));
       const pago = paymentStatus === 'paid';
       for (const item of selectedItems) {
         const paymentPatch = {
           pago,
+          conta_pagamento_id: pago ? (item.conta_pagamento_id || primaryAccount?.id || null) : null,
           data_pagamento: pago ? (item.data_pagamento || new Date().toISOString().slice(0, 10)) : null
         };
         const updatedOrder = await Storage.update(COLLECTION, item.id, paymentPatch);
         await syncServiceOrderFinancials(updatedOrder || { ...item, ...paymentPatch });
       }
-      const warning = pago && selectedItems.some(item => !item.forma_pagamento || !item.conta_pagamento_id)
-        ? ' Os detalhes de forma e conta devem ser preenchidos na edição individual.'
-        : '';
+      const warning = pago && selectedItems.some(item => !item.forma_pagamento)
+        ? ' A forma de pagamento deve ser preenchida na edição individual.'
+        : pago && !primaryAccount && selectedItems.some(item => !item.conta_pagamento_id)
+          ? ' Cadastre uma conta principal ou escolha uma conta na edição individual.'
+          : '';
       Toast.show(`Pagamento atualizado em ${selectedItems.length} ordem(ns) de serviço.${warning}`, 'success');
       await renderList(document.getElementById('main-content').firstElementChild || document.querySelector('.main'));
     } catch (err) {
@@ -446,6 +465,9 @@ const ServiceOrdersModule = (() => {
     const [clients, accounts, allExpenses] = await Promise.all([
       Storage.get('clients'), Storage.get('accounts'), Storage.get('expenses')
     ]);
+    expenseFormAccounts = accounts;
+    primaryAccountId = accounts.find(account => account.is_primary)?.id || '';
+    const paymentAccountId = so?.conta_pagamento_id || primaryAccountId;
     const sortedClients = [...clients].sort((a, b) => (
       (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })
     ));
@@ -512,7 +534,7 @@ const ServiceOrdersModule = (() => {
             <label>Conta que recebeu o pagamento *</label>
             <select id="f-conta-pagamento">
               <option value="">— Selecione a conta —</option>
-              ${accounts.map(account => `<option value="${account.id}" ${so?.conta_pagamento_id === account.id ? 'selected' : ''}>${escapeHtml(account.banco)} - ${escapeHtml(account.titular)}</option>`).join('')}
+              ${accounts.map(account => `<option value="${account.id}" ${paymentAccountId === account.id ? 'selected' : ''}>${escapeHtml(account.banco)} - ${escapeHtml(account.titular)}${account.is_primary ? ' (Principal)' : ''}</option>`).join('')}
             </select>
             ${accounts.length === 0 ? '<small style="color:var(--warning);display:block;margin-top:4px;">Cadastre uma conta antes de registrar um pagamento.</small>' : ''}
           </div>
@@ -550,7 +572,7 @@ const ServiceOrdersModule = (() => {
             descricao: row.querySelector('[data-expense-description]').value.trim(),
             rawValue: row.querySelector('[data-expense-value]').value,
             categoria: existingExpense?.categoria,
-            conta_id: existingExpense?.conta_id,
+            conta_id: row.querySelector('[data-expense-account]').value || null,
             data: existingExpense?.data
           };
         })
@@ -585,7 +607,8 @@ const ServiceOrdersModule = (() => {
       const totalExpenses = expensesToSave.reduce((sum, expense) => sum + expense.valor, 0);
       const payload = {
         clienteId, descricao, valor, custo_reparo: totalExpenses, data_abertura: data, status, obs, pago,
-        forma_pagamento: formaPagamento, conta_pagamento_id: contaPagamentoId,
+        forma_pagamento: formaPagamento,
+        conta_pagamento_id: pago ? (contaPagamentoId || primaryAccountId || null) : null,
         data_pagamento: pago ? (so?.data_pagamento || new Date().toISOString().slice(0, 10)) : null
       };
 
